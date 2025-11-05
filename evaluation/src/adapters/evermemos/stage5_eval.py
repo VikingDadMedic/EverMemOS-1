@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from tqdm import tqdm
 
 
-from evaluation.locomo_evaluation.config import ExperimentConfig
+from evaluation.src.adapters.evermemos.config import ExperimentConfig
 
 logging.basicConfig(level=logging.CRITICAL)
 

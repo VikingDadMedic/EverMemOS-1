@@ -3,19 +3,17 @@ Agentic Retrieval 工具函数
 
 提供 LLM 引导的多轮检索所需的工具：
 1. Sufficiency Check: 判断检索结果是否充分
-2. Query Refinement: 生成改进的查询
-3. Document Formatting: 格式化文档供 LLM 使用
+2. Multi-Query Generation: 生成多个互补查询
+3. Query Refinement: 生成改进的查询（单查询模式）
+4. Document Formatting: 格式化文档供 LLM 使用
 """
 
 import json
 import asyncio
-from pathlib import Path
 from typing import List, Tuple, Optional
 
-# 从 Python 文件导入 prompts（替代读取 txt 文件）
-from evaluation.locomo_evaluation.prompts.sufficiency_check_prompts import SUFFICIENCY_CHECK_PROMPT
-from evaluation.locomo_evaluation.prompts.refined_query_prompts import REFINED_QUERY_PROMPT
-from evaluation.locomo_evaluation.prompts.multi_query_prompts import MULTI_QUERY_GENERATION_PROMPT
+# 从新框架的 prompts 配置加载
+from evaluation.src.utils.prompts import format_prompt
 
 
 def format_documents_for_llm(
@@ -39,7 +37,6 @@ def format_documents_for_llm(
     for i, (doc, score) in enumerate(results[:max_docs], start=1):
         subject = doc.get("subject", "N/A")
         
-        # 🔥 根据 use_episode 参数选择格式
         if use_episode:
             # 使用 Episode Memory 格式（完整叙述）
             episode = doc.get("episode", "N/A")
@@ -170,7 +167,7 @@ def parse_refined_query(response: str, original_query: str) -> str:
 async def check_sufficiency(
     query: str,
     results: List[Tuple[dict, float]],
-    llm_provider,  # 改用 LLMProvider
+    llm_provider,  # LLMProvider from Memory Layer
     llm_config: dict,
     max_docs: int = 10
 ) -> Tuple[bool, str, List[str]]:
@@ -188,20 +185,21 @@ async def check_sufficiency(
         (is_sufficient, reasoning, missing_information)
     """
     try:
-        # 1. 格式化文档（🔥 使用 Episode Memory 格式）
+        # 1. 格式化文档
         retrieved_docs = format_documents_for_llm(
             results, 
             max_docs=max_docs,
-            use_episode=True  # 🔥 强制使用 Episode Memory
+            use_episode=True
         )
         
-        # 2. 使用 prompt 模板
-        prompt = SUFFICIENCY_CHECK_PROMPT.format(
+        # 2. 使用新框架的 prompt 配置
+        prompt = format_prompt(
+            "agentic_sufficiency_check",
             query=query,
             retrieved_docs=retrieved_docs
         )
         
-        # 3. 调用 LLM（使用 LLMProvider）
+        # 3. 调用 LLM
         result_text = await llm_provider.generate(
             prompt=prompt,
             temperature=0.0,  # 低温度，判断更稳定
@@ -233,18 +231,18 @@ async def generate_refined_query(
     original_query: str,
     results: List[Tuple[dict, float]],
     missing_info: List[str],
-    llm_client,
+    llm_provider,
     llm_config: dict,
     max_docs: int = 10
 ) -> str:
     """
-    生成改进的查询
+    生成改进的查询（单查询模式，用于回退）
     
     Args:
         original_query: 原始查询
         results: Round 1 检索结果（Top 10）
         missing_info: 缺失的信息列表
-        llm_client: LLM 客户端
+        llm_provider: LLM Provider
         llm_config: LLM 配置
         max_docs: 最多使用的文档数
     
@@ -252,22 +250,23 @@ async def generate_refined_query(
         改进后的查询字符串
     """
     try:
-        # 1. 格式化文档和缺失信息（🔥 使用 Episode Memory 格式）
+        # 1. 格式化文档和缺失信息
         retrieved_docs = format_documents_for_llm(
             results, 
             max_docs=max_docs,
-            use_episode=True  # 🔥 强制使用 Episode Memory
+            use_episode=True
         )
         missing_info_str = ", ".join(missing_info) if missing_info else "N/A"
         
-        # 2. 使用 prompt 模板
-        prompt = REFINED_QUERY_PROMPT.format(
+        # 2. 使用新框架的 prompt 配置
+        prompt = format_prompt(
+            "agentic_refined_query",
             original_query=original_query,
             retrieved_docs=retrieved_docs,
             missing_info=missing_info_str
         )
         
-        # 3. 调用 LLM（使用 LLMProvider）
+        # 3. 调用 LLM
         result_text = await llm_provider.generate(
             prompt=prompt,
             temperature=0.3,  # 稍高温度，增加创造性
@@ -281,13 +280,11 @@ async def generate_refined_query(
     
     except asyncio.TimeoutError:
         print(f"  ❌ Query refinement timeout (30s)")
-        # 超时回退：使用原始查询
         return original_query
     except Exception as e:
         print(f"  ❌ Query refinement failed: {e}")
         import traceback
         traceback.print_exc()
-        # 回退到原始查询
         return original_query
 
 
@@ -351,7 +348,7 @@ async def generate_multi_queries(
     original_query: str,
     results: List[Tuple[dict, float]],
     missing_info: List[str],
-    llm_provider,  # 改用 LLMProvider
+    llm_provider,
     llm_config: dict,
     max_docs: int = 5,
     num_queries: int = 3
@@ -363,7 +360,7 @@ async def generate_multi_queries(
         original_query: 原始查询
         results: Round 1 检索结果（Top 5）
         missing_info: 缺失的信息列表
-        llm_client: LLM 客户端
+        llm_provider: LLM Provider
         llm_config: LLM 配置
         max_docs: 最多使用的文档数（默认 5）
         num_queries: 期望生成的查询数量（默认 3，实际可能更少）
@@ -374,22 +371,23 @@ async def generate_multi_queries(
         reasoning: LLM 的生成策略说明
     """
     try:
-        # 1. 格式化文档和缺失信息（🔥 使用 Episode Memory 格式）
+        # 1. 格式化文档和缺失信息
         retrieved_docs = format_documents_for_llm(
             results, 
             max_docs=max_docs,
-            use_episode=True  # 🔥 强制使用 Episode Memory
+            use_episode=True
         )
         missing_info_str = ", ".join(missing_info) if missing_info else "N/A"
         
-        # 2. 使用 prompt 模板
-        prompt = MULTI_QUERY_GENERATION_PROMPT.format(
+        # 2. 使用新框架的 prompt 配置
+        prompt = format_prompt(
+            "agentic_multi_query",
             original_query=original_query,
             retrieved_docs=retrieved_docs,
             missing_info=missing_info_str
         )
         
-        # 3. 调用 LLM（使用 LLMProvider）
+        # 3. 调用 LLM
         result_text = await llm_provider.generate(
             prompt=prompt,
             temperature=0.4,  # 稍高温度，增加查询多样性
