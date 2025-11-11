@@ -111,7 +111,6 @@ Beyond "records," dynamic "growth": Real-time user profile updates that get to k
 - [🏗️ Architecture Design](#️-architecture-design)
 - [🤝 Contributing](#-contributing)
 - [🌟 Join Us](#-join-us)
-- [🙏 Acknowledgments](#-acknowledgments)
 
 </td>
 </tr>
@@ -559,19 +558,6 @@ This project is licensed under the [Apache License 2.0](LICENSE). This means you
 - You must state any significant changes made to the code
 - You must retain all copyright, patent, trademark, and attribution notices
 - If a NOTICE file is included, you must include it in your distribution
-
-## 🙏 Acknowledgments
-
-<!-- 
-This section can include:
-- Projects that inspired us
-- Open-source libraries used
-- Supporting organizations or individuals
--->
-
-Thanks to the following projects and communities for their inspiration and support:
-
-- (To be added)
 
 ---
 
