@@ -12,8 +12,8 @@ from tqdm import tqdm
 
 
 
-from evaluation.locomo_evaluation.config import ExperimentConfig
-from evaluation.locomo_evaluation.prompts.answer_prompts import ANSWER_PROMPT
+from evaluation.src.adapters.evermemos.config import ExperimentConfig
+from evaluation.src.adapters.evermemos.prompts.answer_prompts import ANSWER_PROMPT
 
 # 使用 Memory Layer 的 LLMProvider
 from memory_layer.llm.llm_provider import LLMProvider
