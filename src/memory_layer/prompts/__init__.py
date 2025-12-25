@@ -23,8 +23,8 @@ from common_utils.language_utils import (
 # ============================================================================
 # Prompt Registry - maps prompt names to module paths
 # Format: {prompt_name: {language: (module_path, is_function)}}
-# ============================================================================
-
+# ============================================================================#
+# TODO: Optimize prompt registration method (avoid using module paths)
 _PROMPT_REGISTRY = {
     # Conversation
     "CONV_BOUNDARY_DETECTION_PROMPT": {
