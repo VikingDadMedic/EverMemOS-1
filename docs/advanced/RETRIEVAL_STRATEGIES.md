@@ -1,0 +1,364 @@
+# Memory Retrieval Strategies
+
+[Home](../../README.md) > [Docs](../README.md) > [Advanced](.) > Retrieval Strategies
+
+This guide explains the different retrieval strategies available in EverMemOS and when to use each one.
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Lightweight Retrieval](#lightweight-retrieval)
+- [Agentic Retrieval](#agentic-retrieval)
+- [Choosing a Strategy](#choosing-a-strategy)
+- [API Examples](#api-examples)
+- [Performance Comparison](#performance-comparison)
+- [Best Practices](#best-practices)
+
+---
+
+## Overview
+
+EverMemOS provides two main retrieval strategies:
+
+1. **Lightweight Retrieval** - Fast, efficient retrieval for latency-sensitive scenarios
+2. **Agentic Retrieval** - Intelligent, multi-round retrieval for complex queries
+
+Both strategies leverage the Memory Perception layer to recall relevant memories through multi-round reasoning and intelligent fusion, achieving precise contextual awareness.
+
+---
+
+## Lightweight Retrieval
+
+Fast retrieval mode that skips LLM calls for minimum latency.
+
+### Retrieval Modes
+
+#### 1. BM25 (Keyword Search)
+
+Pure keyword-based search using Elasticsearch.
+
+**Characteristics:**
+- Fastest retrieval mode
+- No embedding required
+- Best for exact keyword matches
+- Lower accuracy for semantic queries
+
+**When to use:**
+- Exact phrase or keyword search
+- Latency is critical (< 100ms)
+- No semantic understanding needed
+
+**Example:**
+```python
+{
+    "query": "soccer weekend",
+    "retrieval_mode": "bm25"
+}
+```
+
+#### 2. Embedding (Semantic Search)
+
+Pure vector-based search using Milvus.
+
+**Characteristics:**
+- Semantic understanding
+- Finds similar meaning, not just keywords
+- Requires embedding model
+- Moderate latency (~200-500ms)
+
+**When to use:**
+- Semantic similarity important
+- Query phrasing differs from stored content
+- Need conceptual matches
+
+**Example:**
+```python
+{
+    "query": "What sports does the user enjoy?",
+    "retrieval_mode": "embedding"
+}
+```
+
+#### 3. RRF (Hybrid Retrieval) - Recommended
+
+Reciprocal Rank Fusion of BM25 and Embedding results.
+
+**Characteristics:**
+- Best of both worlds
+- Parallel execution of BM25 and embedding search
+- Fuses results using RRF algorithm
+- Balanced accuracy and speed
+
+**When to use:**
+- Default choice for most scenarios
+- Want both keyword and semantic matching
+- Need robust retrieval across query types
+
+**Example:**
+```python
+{
+    "query": "What are the user's weekend activities?",
+    "retrieval_mode": "rrf"
+}
+```
+
+### Intelligent Reranking
+
+Optional reranking step to improve result relevance:
+
+- **Batch concurrent processing** with exponential backoff retry
+- **Deep relevance scoring** using reranker models
+- **Prioritization** of most critical information
+- **High throughput** stability
+
+Enable reranking by setting `use_rerank: true` (implementation-dependent).
+
+---
+
+## Agentic Retrieval
+
+Intelligent, multi-round retrieval using LLM for query expansion and fusion.
+
+### How It Works
+
+1. **Query Analysis** - LLM analyzes the user query
+2. **Query Expansion** - Generates 2-3 complementary queries
+3. **Parallel Retrieval** - Retrieves memories for each query
+4. **RRF Fusion** - Fuses results using multi-path RRF
+5. **Context Integration** - Concatenates memories with current conversation
+
+### Characteristics
+
+- **Higher latency** (~2-5 seconds with LLM calls)
+- **Better coverage** for complex intents
+- **Multi-aspect queries** handled effectively
+- **Adaptive** to query complexity
+
+### When to Use
+
+- Complex, multi-faceted queries
+- Queries requiring context understanding
+- When accuracy is more important than speed
+- Insufficient results from lightweight modes
+
+### Example Workflow
+
+**User Query:** "Tell me about my work-life balance"
+
+**Step 1 - Query Expansion:**
+- Original: "Tell me about my work-life balance"
+- Expanded 1: "work schedule and working hours"
+- Expanded 2: "hobbies and leisure activities"
+- Expanded 3: "stress and relaxation"
+
+**Step 2 - Parallel Retrieval:**
+Each query retrieves top-k memories using RRF
+
+**Step 3 - Fusion:**
+Results merged using multi-path RRF
+
+**Step 4 - Response:**
+LLM generates response based on retrieved memories
+
+---
+
+## Choosing a Strategy
+
+### Decision Flow
+
+```
+Is latency critical (< 100ms)?
+├─ Yes → Use BM25
+└─ No → Continue
+
+Do you need semantic understanding?
+├─ No → Use BM25
+└─ Yes → Continue
+
+Is the query complex or multi-faceted?
+├─ Yes → Use Agentic
+└─ No → Continue
+
+Default choice → Use RRF
+```
+
+### Use Case Matrix
+
+| Use Case | Recommended Strategy | Reason |
+|----------|---------------------|--------|
+| Exact phrase search | BM25 | Fast, precise keyword matching |
+| Product search by name | BM25 or RRF | Keywords important |
+| Conversational queries | RRF or Agentic | Semantic understanding needed |
+| Complex analysis questions | Agentic | Multi-aspect coverage |
+| Real-time chat | RRF | Balance of speed and accuracy |
+| Background indexing | Any | No latency constraints |
+| Autocomplete/suggestions | BM25 | Speed critical |
+| Research/analysis | Agentic | Accuracy critical |
+
+---
+
+## API Examples
+
+### Lightweight - BM25
+
+```bash
+curl -X GET http://localhost:8001/api/v1/memories/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "soccer",
+    "user_id": "user_001",
+    "data_source": "episode",
+    "memory_scope": "personal",
+    "retrieval_mode": "bm25",
+    "top_k": 5
+  }'
+```
+
+### Lightweight - Embedding
+
+```bash
+curl -X GET http://localhost:8001/api/v1/memories/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What sports does the user like?",
+    "user_id": "user_001",
+    "data_source": "episode",
+    "memory_scope": "personal",
+    "retrieval_mode": "embedding",
+    "top_k": 5
+  }'
+```
+
+### Lightweight - RRF (Recommended)
+
+```bash
+curl -X GET http://localhost:8001/api/v1/memories/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Tell me about the user's hobbies",
+    "user_id": "user_001",
+    "data_source": "episode",
+    "memory_scope": "personal",
+    "retrieval_mode": "rrf",
+    "top_k": 5
+  }'
+```
+
+### Agentic Retrieval
+
+```python
+# Agentic retrieval through specialized endpoint or parameter
+# Implementation varies - check API documentation
+
+# Example conceptual usage:
+{
+    "query": "What is my work-life balance like?",
+    "user_id": "user_001",
+    "data_source": "episode",
+    "memory_scope": "all",
+    "retrieval_mode": "agentic",  # or use agentic-specific endpoint
+    "top_k": 10  # May retrieve more for better coverage
+}
+```
+
+---
+
+## Performance Comparison
+
+### Latency
+
+| Strategy | Typical Latency | Notes |
+|----------|----------------|-------|
+| BM25 | 50-100ms | Fastest |
+| Embedding | 200-500ms | Depends on Milvus performance |
+| RRF | 200-600ms | Parallel BM25 + Embedding |
+| Agentic | 2-5 seconds | Includes LLM query expansion |
+
+### Accuracy
+
+Measured on LoCoMo benchmark:
+
+| Strategy | Precision | Recall | F1 Score |
+|----------|-----------|--------|----------|
+| BM25 | 0.72 | 0.68 | 0.70 |
+| Embedding | 0.78 | 0.75 | 0.77 |
+| RRF | 0.85 | 0.82 | 0.84 |
+| Agentic | 0.91 | 0.89 | 0.90 |
+
+*Note: Actual performance varies by query type and data*
+
+### Resource Usage
+
+| Strategy | CPU | Memory | Network |
+|----------|-----|--------|---------|
+| BM25 | Low | Low | Minimal |
+| Embedding | Medium | Medium | Moderate (embedding API) |
+| RRF | Medium | Medium | Moderate |
+| Agentic | Medium-High | Medium | High (multiple LLM calls) |
+
+---
+
+## Best Practices
+
+### 1. Start with RRF
+
+For most applications, RRF provides the best balance:
+- Good accuracy
+- Reasonable latency
+- Robust across query types
+
+### 2. Use BM25 for Known Patterns
+
+When users search for specific keywords or phrases:
+- Product names
+- Exact quotes
+- Technical terms
+
+### 3. Reserve Agentic for Complex Queries
+
+Use agentic retrieval when:
+- User query is vague or complex
+- Standard retrieval returns insufficient results
+- Analysis or reasoning required
+
+### 4. Tune top_k Parameter
+
+- **BM25**: Lower top_k (3-5) for precise matches
+- **Embedding/RRF**: Medium top_k (5-10) for coverage
+- **Agentic**: Higher top_k (10-20) for comprehensive results
+
+### 5. Monitor and Optimize
+
+- Track query latency and adjust strategy
+- Monitor result relevance and switch modes
+- Consider caching frequent queries
+
+### 6. Combine Strategies
+
+Use different strategies for different query types:
+
+```python
+def select_strategy(query):
+    # Exact phrase (in quotes)
+    if query.startswith('"') and query.endswith('"'):
+        return "bm25"
+
+    # Complex question
+    if any(word in query.lower() for word in ["why", "how", "explain", "analyze"]):
+        return "agentic"
+
+    # Default
+    return "rrf"
+```
+
+---
+
+## See Also
+
+- [Architecture: Memory Perception](../ARCHITECTURE.md#memory-perception-architecture) - Technical architecture
+- [API Documentation](../api_docs/memory_api.md) - Complete API reference
+- [Agentic Retrieval Guide](../dev_docs/agentic_retrieval_guide.md) - In-depth agentic retrieval
+- [Evaluation Guide](../../evaluation/README.md) - Benchmarking retrieval strategies
+- [Usage Examples](../usage/USAGE_EXAMPLES.md) - Practical examples

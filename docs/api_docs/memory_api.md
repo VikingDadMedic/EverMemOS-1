@@ -223,7 +223,7 @@ import asyncio
 async def process_message(message):
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            "http://localhost:1995/api/v1/memories",
+            "http://localhost:8001/api/v1/memories",
             json={
                 "group_id": message["group_id"],
                 "group_name": message["group_name"],
@@ -251,7 +251,7 @@ for msg in consumer:
 ### Using curl
 
 ```bash
-curl -X POST http://localhost:1995/api/v1/memories \
+curl -X POST http://localhost:8001/api/v1/memories \
   -H "Content-Type: application/json" \
   -d '{
     "group_id": "group_123",
@@ -288,7 +288,7 @@ async def call_memory_api():
     
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            "http://localhost:1995/api/v1/memories",
+            "http://localhost:8001/api/v1/memories",
             json=message_data
         )
         result = response.json()
@@ -305,7 +305,7 @@ For JSON files in GroupChatFormat, you can use the `run_memorize.py` script for 
 # Store memory
 python src/bootstrap.py src/run_memorize.py \
   --input data/group_chat.json \
-  --api-url http://localhost:1995/api/v1/memories
+  --api-url http://localhost:8001/api/v1/memories
 
 # Validate format only
 python src/bootstrap.py src/run_memorize.py \
@@ -380,7 +380,7 @@ Use the `run_memorize.py` script:
 ```bash
 python src/bootstrap.py src/run_memorize.py \
   --input data/group_chat.json \
-  --api-url http://localhost:1995/api/v1/memories
+  --api-url http://localhost:8001/api/v1/memories
 ```
 
 ### 7. Are there rate limits for API calls?
@@ -520,7 +520,7 @@ Retrieve user's core memory data through KV method.
 **Using curl**:
 
 ```bash
-curl -X GET "http://localhost:1995/api/v1/memories?user_id=user_123&memory_type=episodic_memory&limit=20" \
+curl -X GET "http://localhost:8001/api/v1/memories?user_id=user_123&memory_type=episodic_memory&limit=20" \
   -H "Content-Type: application/json"
 ```
 
@@ -540,7 +540,7 @@ async def fetch_memories():
     
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            "http://localhost:1995/api/v1/memories",
+            "http://localhost:8001/api/v1/memories",
             params=params
         )
         result = response.json()
@@ -677,7 +677,7 @@ Retrieve relevant memories based on query text using keyword, vector, or hybrid 
 **Using curl**:
 
 ```bash
-curl -X GET http://localhost:1995/api/v1/memories/search \
+curl -X GET http://localhost:8001/api/v1/memories/search \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "user_123",
@@ -704,7 +704,7 @@ async def search_memories():
     
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            "http://localhost:1995/api/v1/memories/search",
+            "http://localhost:8001/api/v1/memories/search",
             json=search_data
         )
         result = response.json()
@@ -898,7 +898,7 @@ Partially update conversation metadata, only updating the provided fields.
 
 ```bash
 # Partially update conversation metadata
-curl -X PATCH http://localhost:1995/api/v1/memories/conversation-meta \
+curl -X PATCH http://localhost:8001/api/v1/memories/conversation-meta \
   -H "Content-Type: application/json" \
   -d '{
     "group_id": "group_123",
@@ -922,7 +922,7 @@ async def patch_conversation_meta():
     
     async with httpx.AsyncClient() as client:
         response = await client.patch(
-            "http://localhost:1995/api/v1/memories/conversation-meta",
+            "http://localhost:8001/api/v1/memories/conversation-meta",
             json=update_data
         )
         result = response.json()
@@ -1045,7 +1045,7 @@ Soft delete MemCell records based on combined filter criteria.
 **Using curl - Delete by event_id**:
 
 ```bash
-curl -X DELETE http://localhost:1995/api/v1/memories \
+curl -X DELETE http://localhost:8001/api/v1/memories \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "evt_001"
@@ -1055,7 +1055,7 @@ curl -X DELETE http://localhost:1995/api/v1/memories \
 **Using curl - Delete all memories of a user**:
 
 ```bash
-curl -X DELETE http://localhost:1995/api/v1/memories \
+curl -X DELETE http://localhost:8001/api/v1/memories \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "user_123"
@@ -1065,7 +1065,7 @@ curl -X DELETE http://localhost:1995/api/v1/memories \
 **Using curl - Delete by user_id and group_id combined**:
 
 ```bash
-curl -X DELETE http://localhost:1995/api/v1/memories \
+curl -X DELETE http://localhost:8001/api/v1/memories \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "user_123",
@@ -1088,7 +1088,7 @@ async def delete_memories():
     
     async with httpx.AsyncClient() as client:
         response = await client.delete(
-            "http://localhost:1995/api/v1/memories",
+            "http://localhost:8001/api/v1/memories",
             json=delete_data
         )
         result = response.json()

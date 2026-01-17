@@ -1,6 +1,5 @@
 # Data - Sample Conversation Data
 
-[English](README.md) | [简体中文](README_zh.md)
 
 This directory contains sample conversation data files used for testing and demonstration purposes.
 
