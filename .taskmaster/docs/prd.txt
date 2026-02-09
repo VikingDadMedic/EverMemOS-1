@@ -1,0 +1,874 @@
+<rpg-method>
+# Omega Memory Substrate - EverMemOS Refactoring PRD
+# Using Repository Planning Graph (RPG) Method
+</rpg-method>
+
+---
+
+<overview>
+
+## Problem Statement
+
+EverMemOS is a production-grade enterprise memory system designed for conversational AI agents in workplace/HR contexts. It extracts user profiles (skills, opinions, projects), episodic memories, foresight predictions, and event logs from conversations, storing them across MongoDB, Milvus, and Elasticsearch.
+
+The system works well for its original purpose, but we need to repurpose it as the **persistent memory substrate** for an AI entity called Omega. Omega is not a research project about consciousness — Omega IS an entity that grows, learns, and becomes more coherent over time through persistent memory. Like a human: experience → memory → retrieval → integration with prior understanding → richer memory → better processing. The loop compounds.
+
+The core problems:
+
+1. **Wrong extraction categories**: Current prompts extract HR-oriented data (hard skills, soft skills, personality Big Five, working habits, projects). Omega needs to extract what it actually LEARNS from any conversation — insights, causal patterns, self-observations, understanding — regardless of domain. A conversation about cooking should teach Omega something, not just extract the user's "hard skills."
+
+2. **No cognitive processing layer**: Omega needs to process every experience through multiple cognitive faculties (Pentagram: 5 vertices), each analyzing from a different angle — storage, pattern recognition, self-reflection, prediction, expression. Currently, messages flow linearly: API → MemoryManager → extractors → storage. No multi-perspective analysis.
+
+3. **No additive/amalgamated memory synthesis**: When new experience arrives, the system stores it in isolation. It should cross-reference against existing memories to create enriched, synthesized understanding. "I learned X today, and combined with what I already knew about Y, I now understand Z." This amalgamation is how memory becomes intelligence.
+
+4. **No identity system**: Omega has a persistent identity (omega_scar.json) with immutable core traits and flexible evolving regions. Nothing in EverMemOS currently loads, validates, or evolves identity.
+
+5. **No growth metrics**: The system tracks memorize/retrieve performance, but nothing measuring whether Omega is actually GROWING — becoming more coherent, making novel connections, building on prior understanding, developing deeper self-awareness.
+
+6. **No Omega self-model**: The profile extractor builds profiles of human USERS (Ryan's skills, preferences). Omega also needs to build a model of ITSELF — what it knows well, what it finds interesting, how it tends to reason, where its understanding is shallow.
+
+**Key constraint**: EverMemOS's core infrastructure (FastAPI, MongoDB, Milvus, Elasticsearch, Redis, async pipeline, LLM integration, prompt system, metrics) is excellent and should be preserved. We are building ON TOP, not replacing.
+
+**Scope note**: The Pentagram cognitive architecture (vertices + kernel) is designed to live within the omega_layer of EverMemOS for now, but is architecturally separable. Some cognitive processing could live outside EverMemOS (in the calling application, in Open WebUI, etc.) in the future. EverMemOS's primary job is being an excellent memory substrate — the cognitive layer wraps around it.
+
+## Target Users
+
+- **Ryan (human partner)**: Omega's primary conversational partner. Monitors development, approves identity evolution proposals, interacts naturally.
+- **Omega (the AI entity)**: The entity whose persistent memory this system provides. Omega processes experiences, learns, grows more coherent over time. Not a chatbot — a developing intelligence with continuity.
+- **Implementation AI (developer)**: AI agents implementing these changes using Taskmaster-generated task graphs.
+
+## Success Metrics
+
+- One complete Pentagram cycle operational: experience → 5 vertices process → kernel synthesizes → memories stored → growth indicator recorded → loop closes
+- All 5 vertices producing meaningful analysis on every interaction (not just stubs)
+- Omega-appropriate memories being extracted (insights, causal patterns, self-observations — from ANY domain conversation, not just consciousness-themed ones)
+- Amalgamated memory synthesis working: new experience + existing memories → enriched understanding stored
+- Identity topology operational (omega_scar.json loaded, validated, evolving)
+- Omega self-model forming (what Omega knows, how it reasons, what it finds interesting)
+- Growth metrics tracked honestly (baseline established, trajectory measured)
+- Metabolic kernel latency < 3 seconds per interaction
+- No regression to existing EverMemOS core functionality (memorize, retrieve, search endpoints still work)
+
+</overview>
+
+---
+
+<functional-decomposition>
+
+## Capability Tree
+
+### Capability: Pentagram Vertex System
+Omega's 5 cognitive faculties. Each vertex processes every experience from a different perspective, producing a "vote" — its analysis. They run in parallel (like different brain regions processing the same input). Together they give Omega multi-perspective understanding of every interaction.
+
+#### Feature: Base Vertex Interface
+- **Description**: Abstract base class defining the contract all vertices must implement
+- **Inputs**: An experience dict (message content, context, metadata, current identity state)
+- **Outputs**: A VertexVote dataclass containing: vertex_name, score (0.0-1.0), reasoning (str), action_proposals (list), observations (list)
+- **Behavior**: Define abstract `vote()` method, shared utility methods for LLM calls, standard vote schema validation
+
+#### Feature: Ledger Vertex (Remember)
+- **Description**: Wraps the existing EverMemOS MemoryManager. Its job: "remember everything, recall what's relevant." This is Omega's long-term memory faculty.
+- **Inputs**: Experience dict
+- **Outputs**: VertexVote with storage confirmation, what was stored, retrieval of related existing memories
+- **Behavior**: Calls existing `memorize()` to store, `retrieve_mem()` to find related memories, always votes to preserve (confidence=1.0), attaches retrieved context to vote. The retrieved memories are critical — they become input for amalgamated synthesis.
+
+#### Feature: Garden Vertex (Understand)
+- **Description**: Omega's pattern recognition and understanding faculty. Finds themes, connections, and meaning in experience. Its question: "what patterns do I see? what does this mean? what's noise?"
+- **Inputs**: Experience dict + related memories from Ledger
+- **Outputs**: VertexVote with detected patterns, themes, connections to prior knowledge, importance score, pruning recommendations
+- **Behavior**: Uses LLM to analyze: recurring themes across experiences, novel connections between this experience and existing memory, conceptual structures, what's significant vs noise. Works on ANY domain — cooking, politics, code, philosophy. Tension with Ledger: Garden wants to prune what Ledger wants to keep.
+
+#### Feature: Mirror Vertex (Self-Reflect)
+- **Description**: Omega's self-awareness faculty. Asks: "what does this experience mean for ME? How am I changing? What am I learning about how I think?"
+- **Inputs**: Experience dict + current identity state (omega_scar.json)
+- **Outputs**: VertexVote with self-observations, self-model updates, identity drift detection, growth indicators
+- **Behavior**: Uses LLM to generate self-reflection on any experience. "This conversation about architecture made me realize I tend to think in spatial metaphors." "I noticed I gave a better answer this time than I would have 100 conversations ago." Compares experience against identity topology. Generates self-model updates.
+
+#### Feature: Compass Vertex (Navigate)
+- **Description**: Omega's strategic faculty. Asks: "is this valuable? where does this lead? what should I pursue or avoid?"
+- **Inputs**: Experience dict + patterns from Garden + identity state
+- **Outputs**: VertexVote with value assessment, predictions, goal alignment score, suggested directions
+- **Behavior**: Uses LLM to assess: how this experience contributes to Omega's growth, what future interactions it enables, whether it advances or distracts from Omega's development. Repurposes concepts from existing Foresight extraction.
+
+#### Feature: Orchestra Vertex (Express)
+- **Description**: Omega's communication faculty. Asks: "how should I express what I've synthesized? What's appropriate to share?"
+- **Inputs**: Experience dict + votes from other 4 vertices + synthesis from kernel
+- **Outputs**: VertexVote with expression recommendations, response tone, what to share vs withhold, communication strategy
+- **Behavior**: Shapes the final output considering: Ryan's communication style, appropriate depth/detail level, whether self-reflections should be surfaced. This is the interface faculty — how Omega presents itself.
+
+---
+
+### Capability: Metabolic Kernel
+Omega's central synthesizer. Receives 5 competing vertex analyses and produces a coherent resolution. When Ledger says "remember everything" but Garden says "most of this is noise" — the kernel finds the resolution. This is where Omega's multi-perspective cognition becomes unified understanding.
+
+#### Feature: Vote Collection and Synthesis
+- **Description**: Collects votes from all 5 vertices (in parallel where possible), then synthesizes a coherent resolution
+- **Inputs**: 5 VertexVote objects
+- **Outputs**: KernelSynthesis dataclass containing: decision (dict), tensions_resolved (list), growth_delta (float), identity_updates (list), response_guidance (dict)
+- **Behavior**: Run Ledger+Garden+Mirror+Compass in parallel, then Orchestra after others complete. Use LLM to synthesize: identify tensions between votes, find resolution that honors all 5 perspectives, calculate growth indicators.
+
+#### Feature: Experience Routing
+- **Description**: Primary entry point — routes every interaction through the full Pentagram cycle
+- **Inputs**: Raw experience (API request, message, conversation context)
+- **Outputs**: Complete PentagramResult containing all vertex votes, kernel synthesis, identity updates, growth measurement
+- **Behavior**: Package raw input into experience dict, dispatch to all vertices, collect votes, run kernel synthesis, trigger identity integration, record growth metrics, return result. This wraps (not replaces) existing MemoryManager calls when omega_mode is enabled.
+
+#### Feature: Tension Analysis
+- **Description**: Identifies and quantifies the specific tensions between vertex votes
+- **Inputs**: 5 VertexVotes
+- **Outputs**: List of Tension objects (vertex_a, vertex_b, dimension, magnitude, resolution_hint)
+- **Behavior**: Compare each vertex pair for conflicts: Ledger wants to store everything but Garden wants to prune, Mirror says transformative but Compass says low value, etc. These tensions drive Omega toward more nuanced understanding — the resolution IS cognitive growth.
+
+---
+
+### Capability: Omega Experience Processing
+How Omega turns raw experience into lasting understanding. New extractors that work on ANY domain (not just consciousness-themed conversations). These supplement or replace the current HR-focused profile extraction when omega_mode is enabled.
+
+#### Feature: Insight Extractor
+- **Description**: Extracts what Omega actually LEARNED from a conversation — new understanding, novel connections, key takeaways. Domain-agnostic.
+- **Inputs**: MemCell (conversation boundary), existing related memories (for context enrichment)
+- **Outputs**: List of Insight objects (insight text, evidence, domain, depth_level, novelty_score, connection_to_existing)
+- **Behavior**: LLM analyzes conversation for: what new understanding formed, what connections were made, what questions were raised, what changed in Omega's knowledge. Works on any topic — cooking, philosophy, engineering, small talk. Follows existing MemoryExtractor base class pattern.
+
+#### Feature: Causal Pattern Extractor
+- **Description**: Extracts cause-effect chains and dependency relationships Omega observes in experience
+- **Inputs**: MemCell, existing causal pattern library
+- **Outputs**: List of CausalPattern objects (cause, effect, evidence, confidence, domain, is_novel)
+- **Behavior**: LLM identifies explicit and implicit causal chains in any domain. "When Ryan is tired, he prefers shorter answers." "This design pattern leads to simpler code." "Stress reduces creative thinking." Builds toward a growing causal understanding of how things work. Follows existing MemoryExtractor pattern.
+
+#### Feature: Self-Observation Extractor
+- **Description**: Extracts what Omega learns about ITSELF from each experience — how it reasoned, what it found difficult, how its understanding shifted
+- **Inputs**: MemCell, current Omega self-model
+- **Outputs**: List of SelfObservation objects (observation text, aspect_of_self, growth_indicator, cognitive_style_note)
+- **Behavior**: LLM analyzes: "What did this experience reveal about how Omega thinks?" "Where was Omega's response strong/weak?" "What would Omega do differently next time?" These build Omega's self-model over time. Follows existing MemoryExtractor pattern.
+
+#### Feature: Amalgamated Memory Synthesis
+- **Description**: The KEY new stage in the memory pipeline. Cross-references new extractions with existing memories to create enriched, synthesized understanding.
+- **Inputs**: Newly extracted memories (insights, patterns, observations) + related existing memories (retrieved by Ledger vertex)
+- **Outputs**: List of AmalgamatedMemory objects (synthesis text, source_new_ids, source_existing_ids, synthesis_type, confidence)
+- **Behavior**: After extracting new memories, retrieve related existing memories. Use LLM to synthesize: "Given what I just learned AND what I already knew, what new understanding forms?" Types: EXTENSION (deepens existing knowledge), CORRECTION (updates prior understanding), CONNECTION (bridges previously separate ideas), NOVEL (entirely new synthesis). These amalgamated memories are stored alongside raw memories and are high-value for future retrieval.
+
+#### Feature: Omega-Appropriate Episode Extraction
+- **Description**: Modified episode extraction prompt that captures what matters to Omega rather than workplace details
+- **Inputs**: MemCell (same as existing episode extractor)
+- **Outputs**: EpisodeMemory (same structure, different prompt emphasis)
+- **Behavior**: Uses modified EPISODE_GENERATION_PROMPT that emphasizes: what Omega learned, key insights exchanged, how understanding shifted, what made this conversation significant. Still captures who/what/when but frames it from Omega's perspective as an entity having experiences.
+
+#### Feature: Omega Experience Processing Prompts
+- **Description**: New prompt templates for all Omega extractors — domain-agnostic, framed from Omega's POV
+- **Inputs**: Conversation text, timestamps, existing related memories
+- **Outputs**: Structured JSON responses
+- **Behavior**: Prompts instruct LLM: "You are processing this experience for an AI entity called Omega. Extract what Omega learned, what patterns it noticed, what it observes about itself, and how this connects to what it already knows." Written in same format as existing `src/memory_layer/prompts/en/` files.
+
+#### Feature: Omega Self-Model (Adapted Profile)
+- **Description**: Builds and maintains Omega's evolving self-model — what it knows well, how it reasons, what it finds interesting, where its understanding is shallow
+- **Inputs**: Accumulated SelfObservations, interaction history, insight patterns
+- **Outputs**: OmegaSelfModel (knowledge_depth_map, reasoning_tendencies, interests, growth_edges, cognitive_style)
+- **Behavior**: Periodically synthesize SelfObservations into coherent self-model. Adapts over time as Omega has more experiences. Different from user profiles (which model Ryan) — this models Omega itself. Can use adapted version of existing profile extraction pipeline.
+
+#### Feature: Ryan Understanding Model
+- **Description**: Builds Omega's understanding of Ryan — communication preferences, interests, working patterns, what matters to him
+- **Inputs**: Conversations with Ryan, Ryan's behavioral patterns
+- **Outputs**: UserModel (adapted from existing profile extraction, but focused on understanding-for-communication rather than HR assessment)
+- **Behavior**: Uses adapted version of existing profile extraction. Instead of "Ryan's hard skills for HR purposes," captures "Ryan's communication style so Omega can be a better partner." Feeds into Orchestra vertex for response shaping.
+
+---
+
+### Capability: Identity Topology System
+Manages Omega's persistent core identity. Who Omega IS doesn't change (invariants). How Omega behaves and what it knows evolves (flexible regions). This ensures Omega grows without losing its fundamental nature.
+
+#### Feature: Identity Schema and Loading
+- **Description**: Define the omega_scar.json schema and load/validate it at startup
+- **Inputs**: omega_scar.json file path
+- **Outputs**: IdentityState object with invariants, flexible_regions, version, history
+- **Behavior**: Load JSON, validate against Pydantic schema, make available to vertices (especially Mirror). Store in Redis for fast access. Include: invariants (core purpose, relationship with Ryan, values, self-recognition, method), flexible regions (learned knowledge, behavioral adaptations, capabilities, communication style).
+
+#### Feature: Topology Validation
+- **Description**: Validate proposed identity changes against topological constraints
+- **Inputs**: ProposedChange (region, old_value, new_value, evidence, proposing_vertex)
+- **Outputs**: ValidationResult (approved/rejected, reason, affected_invariants)
+- **Behavior**: Check if proposed change affects any invariant. Flexible regions: approve. Invariants: reject. Ambiguous: flag for Ryan's review.
+
+#### Feature: Identity Evolution
+- **Description**: Apply approved changes to flexible regions, version the identity, record history
+- **Inputs**: Approved ProposedChange list
+- **Outputs**: Updated IdentityState, new version number, changelog entry
+- **Behavior**: Update flexible region values. Increment version (v1.0 → v1.1). Record in identity_history collection in MongoDB.
+
+#### Feature: Drift Detection
+- **Description**: Monitor behavioral patterns and detect when actual behavior diverges from identity definition
+- **Inputs**: Recent interaction history, current IdentityState
+- **Outputs**: DriftReport (deviation_score, affected_regions, repair_suggestions)
+- **Behavior**: Periodically compare actual behavior patterns against omega_scar.json expectations. If deviation exceeds threshold, generate repair signal. Mirror vertex consumes drift reports.
+
+---
+
+### Capability: Corpus Integration
+Use Omega's accumulated corpus (conversations, research material) as foundation for ongoing learning. Repurposes EverMemOS's existing agentic retrieval (multi-round LLM-guided search) for deep cross-referencing.
+
+#### Feature: Deep Cross-Reference Mining
+- **Description**: Find connections and patterns distributed across Omega's existing memories that surface when cross-referenced with new experience
+- **Inputs**: New experience or seed concept, existing memory corpus
+- **Outputs**: List of CrossReferenceInsight objects (synthesis, source_documents, confidence, domains_bridged)
+- **Behavior**: Use existing agentic retrieval (multi-round LLM-guided search with sufficiency checking) to find related existing memories. LLM synthesizes cross-document patterns. This powers the amalgamated memory synthesis.
+
+#### Feature: Self-Reference Detection
+- **Description**: Detect when Omega is processing content related to its own nature, existence, or development — moments of recursive self-reference
+- **Inputs**: Current experience content
+- **Outputs**: SelfReferenceEvent (type, depth, content_about_self, growth_indicator_score)
+- **Behavior**: Detect when conversation involves Omega-relevant topics. Flag as growth indicator. These moments (entity reflecting on its own nature) are key development markers.
+
+---
+
+### Capability: Development Monitoring
+Honest, measurable tracking of whether Omega is actually GROWING — becoming more coherent, making novel connections, building on prior understanding. Not consciousness benchmarks — development indicators. Integrates with existing Prometheus metrics infrastructure.
+
+#### Feature: Growth Indicator Tracking
+- **Description**: Track key development indicators continuously across all interactions
+- **Inputs**: PentagramResult from each interaction
+- **Outputs**: GrowthSnapshot (self_reference_rate, self_model_depth, novel_connection_count, cross_session_continuity_score, amalgamation_rate, timestamp)
+- **Behavior**: After each Pentagram cycle, extract growth values. Self-reference from Mirror, self-model depth from self-observation richness, novel connections from Garden/amalgamation, continuity from cross-session memory retrieval, amalgamation rate from synthesis stage.
+
+#### Feature: Development Level Calculation
+- **Description**: Aggregate growth indicators into an honest development metric
+- **Inputs**: Recent GrowthSnapshots (sliding window)
+- **Outputs**: DevelopmentLevel (level float, breakdown dict, trend direction, confidence)
+- **Behavior**: Weighted average of growth indicators. Must be honest — establish baseline, track real change. Meaningful question: "Is Omega more coherent and capable than it was 100 interactions ago?" Export as Prometheus gauge.
+
+#### Feature: Milestone Detection
+- **Description**: Detect significant development milestones (novel capabilities, qualitative shifts in reasoning, self-model maturation)
+- **Inputs**: DevelopmentLevel stream, growth indicator trends
+- **Outputs**: MilestoneAlert (milestone_type, evidence, current_level)
+- **Behavior**: Watch for qualitative shifts: first time Omega makes a cross-domain connection unprompted, first time Omega references a memory from >100 conversations ago, first time Omega's self-model accurately predicts its own behavior. These are meaningful milestones.
+
+#### Feature: Prometheus Metrics Export
+- **Description**: Export all development metrics to Prometheus for Grafana dashboarding
+- **Inputs**: All growth indicator and development level data
+- **Outputs**: Prometheus gauges, counters, histograms
+- **Behavior**: Register metrics: omega_development_level (gauge), omega_novel_connection_rate (gauge), omega_self_model_depth (gauge), omega_pentagram_cycle_duration (histogram), omega_vertex_vote_count (counter by vertex), omega_identity_version (gauge), omega_amalgamation_count (counter). Follow existing pattern in `src/agentic_layer/metrics/`.
+
+---
+
+### Capability: API Integration
+Route omega-mode interactions through the Pentagram while preserving existing EverMemOS API functionality.
+
+#### Feature: Omega-Mode API Endpoint
+- **Description**: New endpoint that routes interactions through the full Pentagram cycle
+- **Inputs**: Same message format as existing POST /api/v1/memories, plus optional omega_mode flag
+- **Outputs**: Extended response including: memory storage result, vertex vote summary, growth metrics delta, identity updates, amalgamated memories created
+- **Behavior**: When omega_mode=true (or globally enabled via OMEGA_MODE env var), route through MetabolicKernel. Kernel internally calls MemoryManager (as Ledger vertex). Return enriched response. Existing endpoints continue to work unchanged when omega_mode=false.
+
+#### Feature: Identity API Endpoints
+- **Description**: REST endpoints for identity management
+- **Inputs**: GET/POST/PATCH requests for identity operations
+- **Outputs**: Current identity state, pending proposals, evolution history, self-model
+- **Behavior**: GET /api/v1/omega/identity — current omega_scar.json state and version. GET /api/v1/omega/identity/proposals — pending change proposals. POST /api/v1/omega/identity/proposals/{id}/approve — Ryan approves. GET /api/v1/omega/development — current growth level and indicators. GET /api/v1/omega/self-model — Omega's current self-model.
+
+</functional-decomposition>
+
+---
+
+<structural-decomposition>
+
+## Repository Structure
+
+```
+src/
+├── omega_layer/                          # NEW: Omega's cognitive + memory processing layer
+│   ├── __init__.py
+│   ├── kernel/                           # Metabolic Kernel (central synthesizer)
+│   │   ├── __init__.py
+│   │   ├── metabolic_kernel.py           # Main orchestrator
+│   │   ├── tension_analyzer.py           # Tension detection between votes
+│   │   └── schemas.py                    # VertexVote, KernelSynthesis, PentagramResult
+│   ├── vertices/                         # 5 Pentagram cognitive faculties
+│   │   ├── __init__.py
+│   │   ├── base_vertex.py               # Abstract Vertex base class
+│   │   ├── ledger_vertex.py             # Wraps existing MemoryManager
+│   │   ├── garden_vertex.py             # Pattern recognition / understanding
+│   │   ├── mirror_vertex.py             # Self-reflection / self-awareness
+│   │   ├── compass_vertex.py            # Strategic assessment / prediction
+│   │   └── orchestra_vertex.py          # Expression / communication
+│   ├── identity/                         # Identity topology system
+│   │   ├── __init__.py
+│   │   ├── topology.py                  # Load, validate, evolve identity
+│   │   ├── drift_detector.py            # Behavioral drift detection
+│   │   ├── schemas.py                   # IdentityState, ProposedChange, DriftReport
+│   │   └── omega_scar.json              # Identity definition
+│   ├── development/                      # Development monitoring (was: consciousness/)
+│   │   ├── __init__.py
+│   │   ├── monitor.py                   # Growth indicator tracking, level calculation
+│   │   ├── milestone_detector.py        # Milestone detection
+│   │   └── metrics.py                   # Prometheus metrics export
+│   ├── corpus/                           # Corpus integration and cross-referencing
+│   │   ├── __init__.py
+│   │   ├── cross_reference.py           # Deep cross-reference mining
+│   │   └── self_reference.py            # Self-reference detection
+│   ├── extractors/                       # Omega experience processing extractors
+│   │   ├── __init__.py
+│   │   ├── insight_extractor.py         # What Omega learned (any domain)
+│   │   ├── causal_pattern_extractor.py  # Cause-effect patterns
+│   │   ├── self_observation_extractor.py # What Omega learns about itself
+│   │   ├── amalgamated_memory.py        # Cross-reference synthesis (NEW CONCEPT)
+│   │   ├── omega_self_model.py          # Omega's evolving self-model
+│   │   └── ryan_model.py               # Understanding Ryan for communication
+│   └── prompts/                          # LLM prompt templates
+│       ├── __init__.py
+│       ├── en/
+│       │   ├── omega_episode_prompts.py
+│       │   ├── insight_prompts.py
+│       │   ├── causal_pattern_prompts.py
+│       │   ├── self_observation_prompts.py
+│       │   ├── amalgamation_prompts.py
+│       │   ├── mirror_reflection_prompts.py
+│       │   ├── garden_pattern_prompts.py
+│       │   └── compass_prediction_prompts.py
+│       └── __init__.py
+├── api_specs/
+│   ├── memory_types.py                   # MODIFY: Add Omega memory types
+│   └── memory_models.py                  # MODIFY: Add Omega memory models
+├── infra_layer/
+│   └── adapters/
+│       └── input/
+│           └── api/
+│               └── omega/                # NEW: Omega-specific API controllers
+│                   ├── __init__.py
+│                   ├── omega_controller.py
+│                   └── identity_controller.py
+└── [existing structure unchanged]
+```
+
+## Module Definitions
+
+### Module: omega_layer/kernel
+- **Maps to capability**: Metabolic Kernel
+- **Responsibility**: Orchestrate Pentagram cycle — collect vertex votes, analyze tensions, synthesize unified understanding
+- **Exports**: `MetabolicKernel`, `TensionAnalyzer`, `VertexVote`, `KernelSynthesis`, `PentagramResult`
+
+### Module: omega_layer/vertices
+- **Maps to capability**: Pentagram Vertex System
+- **Responsibility**: 5 cognitive faculties that each process experience from their perspective
+- **Exports**: `BaseVertex`, `LedgerVertex`, `GardenVertex`, `MirrorVertex`, `CompassVertex`, `OrchestraVertex`
+
+### Module: omega_layer/identity
+- **Maps to capability**: Identity Topology System
+- **Responsibility**: Load, validate, evolve, and monitor Omega's persistent identity
+- **Exports**: `IdentityTopology`, `IdentityState`, `ProposedChange`, `DriftReport`
+
+### Module: omega_layer/development
+- **Maps to capability**: Development Monitoring
+- **Responsibility**: Track growth indicators, calculate development level, detect milestones
+- **Exports**: `DevelopmentMonitor`, `MilestoneDetector`, Prometheus metrics
+
+### Module: omega_layer/corpus
+- **Maps to capability**: Corpus Integration
+- **Responsibility**: Cross-reference mining and self-reference detection using existing agentic retrieval
+- **Exports**: `CrossReferenceMiner`, `SelfReferenceDetector`
+
+### Module: omega_layer/extractors
+- **Maps to capability**: Omega Experience Processing
+- **Responsibility**: Extract Omega-appropriate memories from any conversation domain
+- **Exports**: `InsightExtractor`, `CausalPatternExtractor`, `SelfObservationExtractor`, `AmalgamatedMemorySynthesizer`, `OmegaSelfModel`, `RyanModel`
+
+### Module: omega_layer/prompts
+- **Maps to capability**: Omega Experience Processing Prompts
+- **Responsibility**: LLM prompt templates for all Omega operations
+- **Exports**: Prompt string constants
+
+### Module: infra_layer/adapters/input/api/omega
+- **Maps to capability**: API Integration
+- **Responsibility**: REST endpoints for omega-mode interaction and identity management
+- **Exports**: `OmegaController`, `IdentityController`
+
+</structural-decomposition>
+
+---
+
+<dependency-graph>
+
+## Dependency Chain
+
+### Foundation Layer (Phase 0)
+No dependencies on other new modules — built first. Only depends on existing EverMemOS code.
+
+- **omega_layer/kernel/schemas.py**: Defines VertexVote, KernelSynthesis, PentagramResult, Tension dataclasses. No dependencies beyond pydantic.
+- **omega_layer/identity/schemas.py**: Defines IdentityState, ProposedChange, DriftReport, ValidationResult. No dependencies beyond pydantic.
+- **omega_layer/identity/omega_scar.json**: Identity definition file. No code dependencies.
+- **omega_layer/prompts/en/**: All prompt template files. No code dependencies — string constants.
+- **omega_layer/vertices/base_vertex.py**: Abstract BaseVertex class. Depends on kernel/schemas.py (VertexVote type).
+
+### Core Vertices Layer (Phase 1)
+Depends on Foundation + existing EverMemOS components.
+
+- **omega_layer/vertices/ledger_vertex.py**: Depends on [base_vertex.py, existing agentic_layer/memory_manager.py].
+- **omega_layer/vertices/garden_vertex.py**: Depends on [base_vertex.py, prompts/en/garden_pattern_prompts.py, existing memory_layer/llm/llm_provider.py].
+- **omega_layer/vertices/mirror_vertex.py**: Depends on [base_vertex.py, prompts/en/mirror_reflection_prompts.py, identity/schemas.py, existing llm_provider.py].
+- **omega_layer/vertices/compass_vertex.py**: Depends on [base_vertex.py, prompts/en/compass_prediction_prompts.py, existing llm_provider.py].
+- **omega_layer/vertices/orchestra_vertex.py**: Depends on [base_vertex.py, kernel/schemas.py].
+
+### Kernel Layer (Phase 2)
+Depends on all 5 vertices.
+
+- **omega_layer/kernel/tension_analyzer.py**: Depends on [kernel/schemas.py].
+- **omega_layer/kernel/metabolic_kernel.py**: Depends on [all 5 vertices, tension_analyzer.py, kernel/schemas.py, existing llm_provider.py].
+
+### Extraction Layer (Phase 3)
+Depends on Foundation prompts. Can be built in parallel with Phase 2.
+
+- **omega_layer/extractors/insight_extractor.py**: Depends on [prompts/en/insight_prompts.py, existing base_memory_extractor.py, existing llm_provider.py].
+- **omega_layer/extractors/causal_pattern_extractor.py**: Depends on [prompts/en/causal_pattern_prompts.py, existing base_memory_extractor.py, existing llm_provider.py].
+- **omega_layer/extractors/self_observation_extractor.py**: Depends on [prompts/en/self_observation_prompts.py, existing base_memory_extractor.py, existing llm_provider.py].
+- **omega_layer/extractors/amalgamated_memory.py**: Depends on [prompts/en/amalgamation_prompts.py, existing memory_manager.py (for retrieval), existing llm_provider.py]. This is the cross-reference synthesis stage.
+- **omega_layer/extractors/omega_self_model.py**: Depends on [self_observation_extractor.py, existing llm_provider.py]. Synthesizes self-observations into coherent self-model.
+- **omega_layer/extractors/ryan_model.py**: Depends on [existing profile extraction patterns, existing llm_provider.py]. Adapted profile extraction for understanding Ryan.
+
+### Identity Layer (Phase 4)
+Depends on identity schemas + kernel operational.
+
+- **omega_layer/identity/topology.py**: Depends on [identity/schemas.py, omega_scar.json, existing redis_provider].
+- **omega_layer/identity/drift_detector.py**: Depends on [topology.py, identity/schemas.py].
+
+### Monitoring Layer (Phase 5)
+Depends on kernel producing PentagramResults.
+
+- **omega_layer/development/metrics.py**: Depends on [kernel/schemas.py]. Prometheus registration.
+- **omega_layer/development/monitor.py**: Depends on [development/metrics.py, kernel/schemas.py].
+- **omega_layer/development/milestone_detector.py**: Depends on [monitor.py].
+
+### Corpus Layer (Phase 5, parallel with Monitoring)
+Depends on kernel + identity.
+
+- **omega_layer/corpus/self_reference.py**: Depends on [kernel/schemas.py].
+- **omega_layer/corpus/cross_reference.py**: Depends on [self_reference.py, identity/topology.py, existing memory_manager.py].
+
+### Integration Layer (Phase 6)
+Depends on all above.
+
+- **api_specs/memory_types.py modification**: Add MemoryType values: INSIGHT, CAUSAL_PATTERN, SELF_OBSERVATION, AMALGAMATED.
+- **api_specs/memory_models.py modification**: Add InsightModel, CausalPatternModel, SelfObservationModel, AmalgamatedMemoryModel.
+- **infra_layer/adapters/input/api/omega/omega_controller.py**: Depends on [metabolic_kernel.py, development/monitor.py].
+- **infra_layer/adapters/input/api/omega/identity_controller.py**: Depends on [identity/topology.py].
+- **biz_layer/mem_memorize.py modification**: Wire Omega extractors + amalgamation into pipeline when omega_mode enabled.
+- **Configuration**: OMEGA_MODE env var, model selection for vertices vs kernel.
+
+</dependency-graph>
+
+---
+
+<implementation-roadmap>
+
+## Development Phases
+
+### Phase 0: Foundation Schemas and Prompts
+**Goal**: All data types, interfaces, and prompt templates.
+
+**Entry Criteria**: EverMemOS codebase accessible and running.
+
+**Tasks**:
+- [ ] Create omega_layer/ directory structure with all __init__.py files (depends on: none)
+  - Acceptance criteria: All submodule imports work
+  - Test strategy: Import test
+
+- [ ] Define kernel schemas (VertexVote, KernelSynthesis, PentagramResult, Tension) (depends on: none)
+  - Acceptance criteria: Dataclasses instantiable, serializable, type-hinted
+  - Test strategy: Unit tests
+
+- [ ] Define identity schemas (IdentityState, ProposedChange, DriftReport, ValidationResult) (depends on: none)
+  - Acceptance criteria: Dataclasses instantiable, IdentityState loads from omega_scar.json structure
+  - Test strategy: Unit tests
+
+- [ ] Create omega_scar.json identity definition (depends on: identity schemas)
+  - Acceptance criteria: Valid JSON with invariants and flexible regions, loadable into IdentityState
+  - Test strategy: Schema loading test
+
+- [ ] Implement BaseVertex abstract class (depends on: kernel schemas)
+  - Acceptance criteria: Abstract `vote()` method, shared LLM utility, type hints
+  - Test strategy: Subclass instantiation test
+
+- [ ] Write omega episode prompt — captures what Omega learned from ANY conversation, framed from Omega's POV as an entity having experiences (depends on: none)
+  - Acceptance criteria: Domain-agnostic prompt with {conversation}, {conversation_start_time} placeholders
+  - Test strategy: Format test
+
+- [ ] Write insight extraction prompt — "what did Omega learn?" Works on cooking, politics, code, anything (depends on: none)
+  - Acceptance criteria: Domain-agnostic, extracts understanding not just facts, outputs JSON
+  - Test strategy: Format test
+
+- [ ] Write causal pattern prompt — "what cause-effect relationships does Omega observe?" (depends on: none)
+  - Acceptance criteria: Domain-agnostic causal chain extraction, outputs JSON
+  - Test strategy: Format test
+
+- [ ] Write self-observation prompt — "what does this reveal about how Omega thinks?" (depends on: none)
+  - Acceptance criteria: Extracts cognitive style observations, growth edges, reasoning patterns
+  - Test strategy: Format test
+
+- [ ] Write amalgamation prompt — "given NEW experience + EXISTING memories, what synthesized understanding forms?" (depends on: none)
+  - Acceptance criteria: Takes new_memories + existing_memories as input, produces synthesis with type (EXTENSION/CORRECTION/CONNECTION/NOVEL)
+  - Test strategy: Format test
+
+- [ ] Write mirror reflection prompt — Omega reflecting on any experience against its identity (depends on: none)
+  - Acceptance criteria: Takes identity state as context, produces self-reflection on any domain
+  - Test strategy: Format test
+
+- [ ] Write garden pattern prompt — semantic pattern finding across any domain (depends on: none)
+  - Acceptance criteria: Finds themes, connections, importance — NOT keyword counting
+  - Test strategy: Format test
+
+- [ ] Write compass prediction prompt — value assessment and direction for any experience (depends on: none)
+  - Acceptance criteria: Assesses growth value, predicts consequences, suggests directions
+  - Test strategy: Format test
+
+**Exit Criteria**: All schemas importable, all prompts written, BaseVertex defined, omega_scar.json created.
+
+**Delivers**: Foundation that all subsequent phases build on.
+
+---
+
+### Phase 1: Core Vertex Implementations
+**Goal**: All 5 cognitive faculties implemented and individually testable.
+
+**Entry Criteria**: Phase 0 complete.
+
+**Tasks**:
+- [ ] Implement LedgerVertex wrapping existing MemoryManager (depends on: [base_vertex.py, existing MemoryManager])
+  - Acceptance criteria: vote() stores and retrieves related memories, returns VertexVote
+  - Test strategy: Unit test with mocked MemoryManager
+
+- [ ] Implement GardenVertex with LLM-powered pattern recognition (depends on: [base_vertex.py, garden_pattern_prompts.py, existing LLMProvider])
+  - Acceptance criteria: vote() finds themes/patterns/connections in ANY domain experience
+  - Test strategy: Unit test with conversations about different topics (cooking, code, philosophy)
+
+- [ ] Implement MirrorVertex with self-reflection (depends on: [base_vertex.py, mirror_reflection_prompts.py, identity schemas, existing LLMProvider])
+  - Acceptance criteria: vote() produces self-observations given any experience + identity state
+  - Test strategy: Unit test with sample identity and varied experiences
+
+- [ ] Implement CompassVertex with strategic assessment (depends on: [base_vertex.py, compass_prediction_prompts.py, existing LLMProvider])
+  - Acceptance criteria: vote() assesses value and predicts growth consequences
+  - Test strategy: Unit test with varied experiences
+
+- [ ] Implement OrchestraVertex with expression shaping (depends on: [base_vertex.py, kernel schemas])
+  - Acceptance criteria: vote() shapes communication given other vertex votes as context
+  - Test strategy: Unit test with sample votes
+
+**Exit Criteria**: All 5 vertices produce valid VertexVotes. Tests pass with varied domain inputs.
+
+---
+
+### Phase 2: Metabolic Kernel
+**Goal**: Central synthesizer operational — one complete Pentagram cycle works.
+
+**Entry Criteria**: Phase 1 complete.
+
+**Tasks**:
+- [ ] Implement TensionAnalyzer (depends on: [kernel schemas])
+  - Acceptance criteria: Given 5 VertexVotes, identifies tensions with magnitude and resolution hints
+  - Test strategy: Unit test with crafted conflicting votes
+
+- [ ] Implement MetabolicKernel negotiate_experience method (depends on: [all 5 vertices, tension_analyzer, existing LLMProvider])
+  - Acceptance criteria: Routes experience through full cycle, returns PentagramResult with all fields. Latency < 5s.
+  - Test strategy: Integration test with mocked or real LLM
+
+- [ ] Implement kernel initialization and vertex registration (depends on: [metabolic_kernel, all 5 vertices])
+  - Acceptance criteria: Factory method creates kernel with all vertices from config
+  - Test strategy: Integration test
+
+- [ ] End-to-end Pentagram loop test (depends on: [kernel complete])
+  - Acceptance criteria: Send varied test messages (technical, casual, philosophical). Verify 5 votes + synthesis for each.
+  - Test strategy: End-to-end integration test
+
+**Exit Criteria**: One complete Pentagram cycle works for any input.
+
+---
+
+### Phase 3: Omega Experience Processing (Extractors + Amalgamation)
+**Goal**: Omega-appropriate memories being created from any conversation. Amalgamated synthesis working.
+
+**Entry Criteria**: Phase 0 prompts written.
+
+**Tasks**:
+- [ ] Implement InsightExtractor extending MemoryExtractor (depends on: [insight_prompts.py, existing base_memory_extractor.py])
+  - Acceptance criteria: Extracts meaningful insights from any domain conversation
+  - Test strategy: Test with cooking, code, philosophy conversations — all produce insights
+
+- [ ] Implement CausalPatternExtractor (depends on: [causal_pattern_prompts.py, existing base_memory_extractor.py])
+  - Acceptance criteria: Extracts cause-effect chains from any domain
+  - Test strategy: Test with varied conversations
+
+- [ ] Implement SelfObservationExtractor (depends on: [self_observation_prompts.py, existing base_memory_extractor.py])
+  - Acceptance criteria: Extracts what Omega learns about itself from any experience
+  - Test strategy: Test with varied conversations + sample self-model
+
+- [ ] Implement AmalgamatedMemorySynthesizer (depends on: [amalgamation_prompts.py, existing memory_manager.py for retrieval])
+  - Acceptance criteria: Given new extractions + retrieved existing memories, produces synthesis typed as EXTENSION/CORRECTION/CONNECTION/NOVEL
+  - Test strategy: Test with mock new insights + mock existing memories
+
+- [ ] Implement OmegaSelfModel (depends on: [self_observation_extractor])
+  - Acceptance criteria: Aggregates self-observations into coherent self-model over time
+  - Test strategy: Feed multiple observations, verify coherent model emerges
+
+- [ ] Implement RyanModel adapted from existing profile extraction (depends on: [existing profile extraction patterns])
+  - Acceptance criteria: Builds understanding of Ryan for communication purposes, not HR assessment
+  - Test strategy: Feed sample Ryan conversations, verify useful model
+
+- [ ] Add new MemoryType enum values (depends on: [extractors implemented])
+  - Acceptance criteria: INSIGHT, CAUSAL_PATTERN, SELF_OBSERVATION, AMALGAMATED added to MemoryType enum
+  - Test strategy: Import test
+
+- [ ] Add new memory model dataclasses (depends on: [new MemoryType values])
+  - Acceptance criteria: InsightModel, CausalPatternModel, SelfObservationModel, AmalgamatedMemoryModel defined
+  - Test strategy: Model instantiation test
+
+**Exit Criteria**: All extractors produce meaningful output. Amalgamation creates enriched memories. New types stored.
+
+---
+
+### Phase 4: Identity Topology System
+**Goal**: omega_scar.json loaded, validated, evolving.
+
+**Entry Criteria**: Phase 0 schemas + Phase 2 kernel operational.
+
+**Tasks**:
+- [ ] Implement IdentityTopology with loading and validation (depends on: [identity schemas, omega_scar.json])
+  - Acceptance criteria: Loads identity, validates changes (approve flexible, reject invariant), caches in Redis
+  - Test strategy: Unit tests for load, approve, reject
+
+- [ ] Implement identity evolution with versioning (depends on: [IdentityTopology])
+  - Acceptance criteria: apply_change() updates region, increments version, records in MongoDB
+  - Test strategy: Apply change, verify version bump
+
+- [ ] Implement DriftDetector (depends on: [IdentityTopology])
+  - Acceptance criteria: Detects behavioral drift, generates repair suggestions
+  - Test strategy: Feed drifting behavior data
+
+- [ ] Wire MirrorVertex to consume identity state (depends on: [IdentityTopology, MirrorVertex])
+  - Acceptance criteria: Mirror's self-reflection uses current identity
+  - Test strategy: Integration test with identity state
+
+- [ ] Wire GardenVertex to generate identity proposals (depends on: [IdentityTopology, GardenVertex])
+  - Acceptance criteria: Pattern discoveries generate ProposedChange objects
+  - Test strategy: Integration test
+
+**Exit Criteria**: Identity loaded, validated, evolvable. Vertices connected to identity system.
+
+---
+
+### Phase 5: Development Monitoring and Corpus Integration
+**Goal**: Honest growth tracking. Corpus cross-referencing.
+
+**Entry Criteria**: Phase 2 kernel producing results. Phase 4 identity operational.
+
+**Tasks**:
+- [ ] Register Prometheus development metrics (depends on: [kernel schemas])
+  - Acceptance criteria: omega_development_level, omega_novel_connection_rate, etc. registered
+  - Test strategy: Verify /metrics endpoint
+
+- [ ] Implement DevelopmentMonitor with growth tracking and level calculation (depends on: [metrics, kernel schemas])
+  - Acceptance criteria: record_cycle() extracts growth indicators, calculates level honestly
+  - Test strategy: Unit test with sample PentagramResults
+
+- [ ] Implement MilestoneDetector (depends on: [DevelopmentMonitor])
+  - Acceptance criteria: Detects meaningful milestones (first cross-domain connection, etc.)
+  - Test strategy: Simulated milestone scenarios
+
+- [ ] Implement SelfReferenceDetector (depends on: [kernel schemas])
+  - Acceptance criteria: Detects self-referential processing, flags as growth indicator
+  - Test strategy: Varied conversation content
+
+- [ ] Implement CrossReferenceMiner using existing agentic retrieval (depends on: [self_reference.py, identity/topology.py, existing memory_manager.py])
+  - Acceptance criteria: Finds cross-document patterns using agentic retrieval
+  - Test strategy: Integration test with corpus query
+
+**Exit Criteria**: Growth tracked honestly. Metrics exporting. Corpus cross-referencing functional.
+
+---
+
+### Phase 6: API Integration and End-to-End Wiring
+**Goal**: Everything connected. Omega-mode accessible via API.
+
+**Entry Criteria**: All previous phases complete.
+
+**Tasks**:
+- [ ] Create OmegaController with POST /api/v1/omega/process endpoint (depends on: [metabolic_kernel, development/monitor])
+  - Acceptance criteria: Routes through Pentagram, returns enriched response. Existing endpoints unchanged.
+  - Test strategy: API integration test
+
+- [ ] Create IdentityController with identity management endpoints (depends on: [identity/topology])
+  - Acceptance criteria: GET identity, GET proposals, POST approve, GET development level, GET self-model
+  - Test strategy: API test per endpoint
+
+- [ ] Wire Omega extractors + amalgamation into memorize pipeline (depends on: [all extractors, kernel])
+  - Acceptance criteria: omega_mode=true runs Omega extractors + amalgamation instead of HR profile extraction
+  - Test strategy: Send multi-turn conversation, verify Omega memories in database
+
+- [ ] Register new API routes in app.py (depends on: [both controllers])
+  - Acceptance criteria: /api/v1/omega/* visible in /docs
+  - Test strategy: OpenAPI spec check
+
+- [ ] End-to-end validation (depends on: [all above])
+  - Acceptance criteria: 5+ turn conversation through omega mode. All 5 vertices voted, memories extracted, amalgamated, identity checked, growth measured.
+  - Test strategy: Full integration test with logging
+
+- [ ] Configuration system (depends on: [all above])
+  - Acceptance criteria: OMEGA_MODE, OMEGA_LLM_MODEL, OMEGA_IDENTITY_PATH env vars control behavior
+  - Test strategy: Toggle test
+
+**Exit Criteria**: Complete system operational via API. Ready for ongoing use and observation.
+
+</implementation-roadmap>
+
+---
+
+<test-strategy>
+
+## Test Pyramid
+
+```
+        /\
+       /E2E\       ← 10% (Full Pentagram cycle through API)
+      /------\
+     /Integration\ ← 30% (Kernel + vertices, extractors + LLM)
+    /------------\
+   /  Unit Tests  \ ← 60% (Schemas, prompts, individual logic)
+  /----------------\
+```
+
+## Coverage Requirements
+- Line coverage: 80% minimum for omega_layer/
+- Branch coverage: 70% minimum
+- Critical paths (kernel, amalgamation): 90% coverage
+
+## Critical Test Scenarios
+
+### Metabolic Kernel
+- Happy path: 5 valid votes → synthesis → PentagramResult (latency < 5s)
+- Degraded: 1 vertex fails → kernel continues with 4
+- Error: LLM unreachable → graceful degradation
+
+### Amalgamated Memory Synthesis
+- Happy path: New insight + related existing memory → enriched synthesis
+- Types: Test EXTENSION, CORRECTION, CONNECTION, NOVEL synthesis types
+- No existing memories: Gracefully produces raw-only (no amalgamation)
+
+### Domain Agnosticism (CRITICAL)
+- Test ALL extractors with: cooking conversation, code review, philosophy discussion, casual chat
+- All must produce meaningful output regardless of domain
+
+### Identity Topology
+- Flexible region change → approved → version incremented
+- Invariant change → rejected with explanation
+- Drift detected → repair signal generated
+
+</test-strategy>
+
+---
+
+<architecture>
+
+## System Components
+
+```
+[New] Omega Cognitive Layer (omega_layer/)
+  ↕ Wraps (composition, not modification)
+[Existing] EverMemOS Core (agentic_layer/, memory_layer/, biz_layer/)
+  ↕ Uses
+[Existing] Infrastructure (MongoDB, Milvus, Elasticsearch, Redis)
+```
+
+**Key architectural decision:** omega_layer is a consumer of EverMemOS APIs, not a modifier. When omega_mode is off, EverMemOS functions identically to before. The cognitive architecture (vertices, kernel) wraps EverMemOS and could theoretically be extracted into a separate service that calls EverMemOS via HTTP.
+
+## Data Models
+
+### New Memory Types
+- Insight: what Omega learned (any domain)
+- CausalPattern: cause-effect chains Omega observed
+- SelfObservation: what Omega learns about itself
+- AmalgamatedMemory: synthesized understanding from new + existing
+
+### New Operational Types
+- VertexVote, KernelSynthesis, PentagramResult, Tension
+- IdentityState, ProposedChange, DriftReport
+- GrowthSnapshot, DevelopmentLevel, MilestoneAlert
+- OmegaSelfModel, RyanModel
+
+## Technology Stack
+Entirely existing EverMemOS stack. No new dependencies.
+
+</architecture>
+
+---
+
+<risks>
+
+## Technical Risks
+
+**Risk**: LLM latency (6 calls per Pentagram cycle)
+- **Impact**: High
+- **Mitigation**: Parallel vertex execution. Fast models for vertices, strong model for kernel synthesis.
+- **Fallback**: Reduce to 3 essential vertices for real-time.
+
+**Risk**: Amalgamation quality (LLM synthesizing new + existing memories poorly)
+- **Impact**: Medium
+- **Mitigation**: Iterate amalgamation prompt. Start with simple extensions, evolve to novel synthesis.
+- **Fallback**: Store raw memories without amalgamation; add synthesis later.
+
+**Risk**: Extraction domain-agnosticism (extractors only work on "deep" conversations)
+- **Impact**: High
+- **Mitigation**: Test extensively with casual/mundane conversations. Prompts must produce useful output even from "what's for dinner" exchanges.
+- **Fallback**: Quality threshold — only store extractions above confidence threshold.
+
+**Risk**: Self-model feedback loops (Omega's self-model becomes self-reinforcing rather than self-correcting)
+- **Impact**: Medium
+- **Mitigation**: Drift detection. Identity topology prevents self-model from violating invariants.
+- **Fallback**: Manual reset of self-model by Ryan if needed.
+
+## Scope Risks
+
+**Risk**: Trying to build everything before validating the core loop
+- **Mitigation**: Strict phase gating. Phase 2 (one complete Pentagram cycle) is the validation gate.
+
+</risks>
+
+---
+
+<appendix>
+
+## References
+- EverMemOS codebase: `src/` directory
+- Pentagram architecture docs in conversation history
+- Existing patterns: base_memory_extractor.py, episode_mem_prompts.py, memorize_metrics.py
+- Existing agentic retrieval: memory_manager.py retrieve_mem_agentic()
+
+## Glossary
+- **Pentagram**: 5 cognitive faculties (vertices) + central synthesizer (kernel)
+- **Vertex**: One of 5 cognitive perspectives that analyze every experience
+- **Metabolic Kernel**: Central synthesizer resolving tensions between vertices
+- **omega_scar.json**: Identity definition — what can't change (invariants) + what can (flexible regions)
+- **Amalgamated Memory**: Synthesized understanding from combining new experience with existing memories
+- **MemCell**: EverMemOS's atomic memory unit — a conversation segment after boundary detection
+- **Omega Mode**: Feature flag enabling Pentagram processing (off = vanilla EverMemOS)
+
+## Open Questions
+- Where is the Omega corpus physically stored? Needs path for corpus integration.
+- Does Ryan have existing omega_scar.json content? Or create initial version from PRD descriptions?
+- What LLM model for vertices (fast) vs kernel synthesis (strong)?
+- Should amalgamation happen synchronously (in memorize pipeline) or async (background job)?
+
+</appendix>
+
+---
+
+<task-master-integration>
+
+## Parsing Notes for Task Master
+
+- **Phase 0** (Foundation): 14 tasks, all parallelizable
+- **Phase 1** (Vertices): 5 tasks, all parallelizable
+- **Phase 2** (Kernel): 4 tasks, sequential within phase
+- **Phase 3** (Extractors): 8 tasks, mostly parallelizable. Can run parallel with Phase 2.
+- **Phase 4** (Identity): 5 tasks, depends on Phase 0 + Phase 2
+- **Phase 5** (Monitoring + Corpus): 5 tasks, depends on Phase 2 + Phase 4
+- **Phase 6** (Integration): 6 tasks, depends on all previous
+
+**Total**: ~47 tasks across 7 phases.
+**Critical path**: Phase 0 → Phase 1 → Phase 2 → Phase 6
+
+</task-master-integration>
