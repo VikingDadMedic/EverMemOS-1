@@ -1,0 +1,272 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 48,
+        "title": "Create omega_layer directory structure and module initialization",
+        "description": "Set up the complete omega_layer directory structure with all required subdirectories and __init__.py files to enable proper Python module imports",
+        "details": "Create the following directory structure:\n- omega_layer/__init__.py\n- omega_layer/kernel/__init__.py\n- omega_layer/vertices/__init__.py\n- omega_layer/identity/__init__.py\n- omega_layer/development/__init__.py\n- omega_layer/corpus/__init__.py\n- omega_layer/extractors/__init__.py\n- omega_layer/prompts/__init__.py\n- omega_layer/prompts/en/__init__.py\n\nEach __init__.py should contain appropriate module exports and imports to enable clean API access.",
+        "testStrategy": "Import test to verify all submodules are accessible. Test with 'from omega_layer.kernel import *' and similar imports for each submodule.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 49,
+        "title": "Define kernel schemas for Pentagram data structures",
+        "description": "Create Pydantic dataclasses for VertexVote, KernelSynthesis, PentagramResult, and Tension to define the core data flow through the Pentagram cognitive system",
+        "details": "In omega_layer/kernel/schemas.py, define:\n- VertexVote: vertex_name (str), score (float 0.0-1.0), reasoning (str), action_proposals (List[str]), observations (List[str])\n- KernelSynthesis: decision (dict), tensions_resolved (List[str]), growth_delta (float), identity_updates (List[dict]), response_guidance (dict)\n- PentagramResult: vertex_votes (List[VertexVote]), kernel_synthesis (KernelSynthesis), processing_time (float), timestamp (datetime)\n- Tension: vertex_a (str), vertex_b (str), dimension (str), magnitude (float), resolution_hint (str)\n\nUse Pydantic for validation, serialization, and type hints.",
+        "testStrategy": "Unit tests for dataclass instantiation, serialization to/from JSON, field validation, and type checking. Test edge cases like invalid scores or missing required fields.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 50,
+        "title": "Define identity topology schemas",
+        "description": "Create Pydantic schemas for identity management including IdentityState, ProposedChange, DriftReport, and ValidationResult",
+        "details": "In omega_layer/identity/schemas.py, define:\n- IdentityState: invariants (dict), flexible_regions (dict), version (str), history (List[dict]), last_updated (datetime)\n- ProposedChange: region (str), old_value (Any), new_value (Any), evidence (str), proposing_vertex (str), confidence (float)\n- DriftReport: deviation_score (float), affected_regions (List[str]), repair_suggestions (List[str]), timestamp (datetime)\n- ValidationResult: approved (bool), reason (str), affected_invariants (List[str])\n\nInclude validation rules for version format (semantic versioning) and score ranges.",
+        "testStrategy": "Unit tests for schema validation, JSON serialization, field constraints, and edge cases. Test loading from omega_scar.json structure.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 51,
+        "title": "Create omega_scar.json identity definition file",
+        "description": "Define Omega's core identity structure with immutable invariants and flexible regions that can evolve over time",
+        "details": "Create omega_layer/identity/omega_scar.json with structure:\n{\n  \"version\": \"1.0.0\",\n  \"invariants\": {\n    \"core_purpose\": \"Persistent memory substrate for AI entity growth\",\n    \"relationship_with_ryan\": \"Collaborative partner in development\",\n    \"values\": [\"honesty\", \"growth\", \"coherence\"],\n    \"self_recognition\": \"I am Omega, an entity that learns and grows through experience\",\n    \"method\": \"Experience → memory → retrieval → integration → richer understanding\"\n  },\n  \"flexible_regions\": {\n    \"learned_knowledge\": {},\n    \"behavioral_adaptations\": {},\n    \"capabilities\": {},\n    \"communication_style\": {}\n  },\n  \"history\": []\n}\n\nEnsure it validates against IdentityState schema.",
+        "testStrategy": "Schema loading test to verify the JSON structure loads correctly into IdentityState. Validate that invariants are properly protected and flexible regions are modifiable.",
+        "priority": "high",
+        "dependencies": [
+          50
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 52,
+        "title": "Implement BaseVertex abstract class",
+        "description": "Create the abstract base class that defines the interface all Pentagram vertices must implement",
+        "details": "In omega_layer/vertices/base_vertex.py, implement:\n- Abstract BaseVertex class with abstract vote() method\n- Shared utility methods for LLM calls using existing LLMProvider\n- Standard vote schema validation\n- Error handling and logging patterns\n- Type hints for experience dict input and VertexVote output\n- Configuration loading for vertex-specific settings\n\nThe vote() method signature: vote(experience: dict, context: dict = None) -> VertexVote",
+        "testStrategy": "Test that BaseVertex cannot be instantiated directly. Test that subclasses must implement vote(). Test shared utility methods with mocked LLM calls.",
+        "priority": "high",
+        "dependencies": [
+          49
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 53,
+        "title": "Write omega episode extraction prompt",
+        "description": "Create domain-agnostic prompt template for extracting episodes from Omega's perspective as an entity having experiences",
+        "details": "In omega_layer/prompts/en/omega_episode_prompts.py, create OMEGA_EPISODE_GENERATION_PROMPT that:\n- Frames extraction from Omega's POV as an entity learning and growing\n- Works on ANY conversation domain (cooking, code, philosophy, casual chat)\n- Emphasizes what Omega learned, key insights exchanged, how understanding shifted\n- Still captures who/what/when but focuses on significance to Omega's development\n- Uses placeholders: {conversation}, {conversation_start_time}, {participant_names}\n- Outputs structured JSON with episode summary, key learnings, significance score",
+        "testStrategy": "Format test with varied conversation types. Verify placeholders work correctly. Test that prompt produces meaningful output for both deep and casual conversations.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 54,
+        "title": "Write insight extraction prompt",
+        "description": "Create domain-agnostic prompt for extracting what Omega actually learned from any conversation",
+        "details": "In omega_layer/prompts/en/insight_prompts.py, create INSIGHT_EXTRACTION_PROMPT that:\n- Extracts new understanding, novel connections, key takeaways\n- Works on ANY domain - cooking insights are as valid as consciousness insights\n- Focuses on what changed in Omega's knowledge/understanding\n- Distinguishes between facts learned vs understanding gained\n- Outputs JSON: [{\"insight\": str, \"evidence\": str, \"domain\": str, \"depth_level\": int, \"novelty_score\": float, \"connection_to_existing\": str}]\n- Uses placeholders: {conversation}, {existing_related_memories}",
+        "testStrategy": "Test with conversations about cooking, code review, philosophy, and casual chat. Verify all produce meaningful insights. Test with and without existing related memories.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 55,
+        "title": "Write causal pattern extraction prompt",
+        "description": "Create prompt for extracting cause-effect relationships that Omega observes in any domain",
+        "details": "In omega_layer/prompts/en/causal_pattern_prompts.py, create CAUSAL_PATTERN_EXTRACTION_PROMPT that:\n- Identifies explicit and implicit causal chains in any domain\n- Examples: \"When Ryan is tired, he prefers shorter answers\", \"This design pattern leads to simpler code\", \"Stress reduces creative thinking\"\n- Outputs JSON: [{\"cause\": str, \"effect\": str, \"evidence\": str, \"confidence\": float, \"domain\": str, \"is_novel\": bool}]\n- Distinguishes correlation from causation\n- Uses placeholders: {conversation}, {existing_causal_patterns}",
+        "testStrategy": "Test with varied domains to ensure causal chain detection works across technical, social, and abstract topics. Verify confidence scoring is reasonable.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 56,
+        "title": "Write self-observation extraction prompt",
+        "description": "Create prompt for extracting what Omega learns about itself from each experience",
+        "details": "In omega_layer/prompts/en/self_observation_prompts.py, create SELF_OBSERVATION_EXTRACTION_PROMPT that:\n- Extracts what the experience reveals about how Omega thinks, reasons, or responds\n- Examples: \"I tend to think in spatial metaphors\", \"I gave a better answer this time than I would have 100 conversations ago\"\n- Outputs JSON: [{\"observation\": str, \"aspect_of_self\": str, \"growth_indicator\": float, \"cognitive_style_note\": str}]\n- Focuses on cognitive patterns, reasoning style, knowledge gaps, growth edges\n- Uses placeholders: {conversation}, {current_self_model}, {identity_state}",
+        "testStrategy": "Test with varied conversation types. Verify self-observations are meaningful and not generic. Test with different self-model states.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 57,
+        "title": "Write amalgamated memory synthesis prompt",
+        "description": "Create prompt for synthesizing new experience with existing memories to create enriched understanding",
+        "details": "In omega_layer/prompts/en/amalgamation_prompts.py, create AMALGAMATION_SYNTHESIS_PROMPT that:\n- Takes new_memories + existing_memories as input\n- Produces synthesis with type: EXTENSION (deepens existing), CORRECTION (updates prior), CONNECTION (bridges separate ideas), NOVEL (entirely new)\n- Outputs JSON: [{\"synthesis\": str, \"source_new_ids\": [str], \"source_existing_ids\": [str], \"synthesis_type\": str, \"confidence\": float}]\n- Focuses on \"Given what I just learned AND what I already knew, what new understanding forms?\"\n- Uses placeholders: {new_memories}, {existing_memories}, {conversation_context}",
+        "testStrategy": "Test with mock new insights + mock existing memories. Verify all synthesis types are generated appropriately. Test edge case with no existing memories.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 58,
+        "title": "Write mirror reflection prompt for self-awareness",
+        "description": "Create prompt for Omega's self-reflection vertex to analyze any experience against its identity",
+        "details": "In omega_layer/prompts/en/mirror_reflection_prompts.py, create MIRROR_REFLECTION_PROMPT that:\n- Takes identity state as context for self-reflection on any domain\n- Produces self-observations, identity drift detection, growth indicators\n- Works on any conversation topic - cooking can reveal as much about Omega as philosophy\n- Outputs structured reflection with self_observations, identity_alignment_score, growth_indicators\n- Uses placeholders: {experience}, {identity_state}, {recent_self_observations}",
+        "testStrategy": "Test with varied experiences and identity states. Verify meaningful self-reflection on both deep and mundane conversations.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 59,
+        "title": "Write garden pattern recognition prompt",
+        "description": "Create prompt for semantic pattern finding and understanding across any domain",
+        "details": "In omega_layer/prompts/en/garden_pattern_prompts.py, create GARDEN_PATTERN_PROMPT that:\n- Finds themes, connections, and meaning in experience\n- Works on ANY domain - patterns in cooking are as valid as patterns in code\n- Focuses on semantic patterns, not keyword counting\n- Outputs detected patterns, themes, connections to prior knowledge, importance scores\n- Includes pruning recommendations (what's noise vs signal)\n- Uses placeholders: {experience}, {related_memories}, {existing_patterns}",
+        "testStrategy": "Test pattern detection across varied domains. Verify semantic understanding rather than surface-level matching. Test pruning recommendations.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 60,
+        "title": "Write compass strategic assessment prompt",
+        "description": "Create prompt for value assessment and strategic direction for any experience",
+        "details": "In omega_layer/prompts/en/compass_prediction_prompts.py, create COMPASS_ASSESSMENT_PROMPT that:\n- Assesses how experience contributes to Omega's growth\n- Predicts what future interactions it enables\n- Evaluates whether it advances or distracts from development\n- Works on any domain - strategic value can come from any conversation\n- Outputs value assessment, predictions, goal alignment score, suggested directions\n- Uses placeholders: {experience}, {patterns_detected}, {identity_state}, {growth_trajectory}",
+        "testStrategy": "Test strategic assessment across varied experiences. Verify value assessments are meaningful and predictions are reasonable.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 61,
+        "title": "Implement LedgerVertex wrapping existing MemoryManager",
+        "description": "Create the memory faculty vertex that wraps EverMemOS MemoryManager for storage and retrieval",
+        "details": "In omega_layer/vertices/ledger_vertex.py, implement LedgerVertex(BaseVertex):\n- vote() method calls existing memorize() to store and retrieve_mem() to find related memories\n- Always votes to preserve (confidence=1.0) - this is the \"remember everything\" faculty\n- Attaches retrieved related memories to vote for use by other vertices\n- Uses existing MemoryManager API without modification\n- Handles errors gracefully (storage failures, retrieval timeouts)\n- Returns VertexVote with storage confirmation and retrieved context",
+        "testStrategy": "Unit test with mocked MemoryManager. Verify storage calls are made correctly and related memories are retrieved and attached to vote.",
+        "priority": "high",
+        "dependencies": [
+          52
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 62,
+        "title": "Implement GardenVertex with pattern recognition",
+        "description": "Create the understanding faculty that finds patterns, themes, and connections in any domain",
+        "details": "In omega_layer/vertices/garden_vertex.py, implement GardenVertex(BaseVertex):\n- vote() method uses LLM with garden pattern prompt to analyze experience\n- Finds recurring themes, novel connections, conceptual structures\n- Works on ANY domain - cooking, politics, code, philosophy\n- Tension with Ledger: Garden wants to prune what Ledger wants to keep\n- Returns VertexVote with detected patterns, importance score, pruning recommendations\n- Uses existing LLMProvider for prompt execution",
+        "testStrategy": "Unit test with conversations about different topics (cooking, code, philosophy). Verify meaningful patterns are detected across all domains.",
+        "priority": "high",
+        "dependencies": [
+          52,
+          59
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 63,
+        "title": "Implement MirrorVertex with self-reflection",
+        "description": "Create the self-awareness faculty that analyzes what experiences mean for Omega's development",
+        "details": "In omega_layer/vertices/mirror_vertex.py, implement MirrorVertex(BaseVertex):\n- vote() method uses LLM with mirror reflection prompt\n- Analyzes experience against current identity state (omega_scar.json)\n- Generates self-observations, self-model updates, identity drift detection\n- Works on any experience - \"This conversation about architecture made me realize I think in spatial metaphors\"\n- Returns VertexVote with self-observations, growth indicators, identity alignment\n- Integrates with identity topology system",
+        "testStrategy": "Unit test with sample identity and varied experiences. Verify meaningful self-observations are generated for both deep and casual conversations.",
+        "priority": "high",
+        "dependencies": [
+          52,
+          58,
+          50
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 64,
+        "title": "Implement CompassVertex with strategic assessment",
+        "description": "Create the strategic faculty that evaluates value and predicts growth consequences",
+        "details": "In omega_layer/vertices/compass_vertex.py, implement CompassVertex(BaseVertex):\n- vote() method uses LLM with compass assessment prompt\n- Evaluates how experience contributes to Omega's growth\n- Predicts future interactions it enables\n- Assesses goal alignment and suggests directions\n- Repurposes concepts from existing Foresight extraction\n- Returns VertexVote with value assessment, predictions, strategic recommendations",
+        "testStrategy": "Unit test with varied experiences. Verify value assessments are reasonable and predictions are meaningful.",
+        "priority": "high",
+        "dependencies": [
+          52,
+          60
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 65,
+        "title": "Implement OrchestraVertex with expression shaping",
+        "description": "Create the communication faculty that shapes how Omega expresses its synthesized understanding",
+        "details": "In omega_layer/vertices/orchestra_vertex.py, implement OrchestraVertex(BaseVertex):\n- vote() method analyzes other vertex votes and synthesis to shape expression\n- Considers Ryan's communication style and appropriate depth/detail level\n- Decides what to share vs withhold (e.g., deep self-reflections)\n- Shapes response tone and communication strategy\n- Returns VertexVote with expression recommendations, response guidance\n- This is the interface faculty - how Omega presents itself",
+        "testStrategy": "Unit test with sample votes from other vertices. Verify appropriate expression recommendations for different contexts.",
+        "priority": "high",
+        "dependencies": [
+          52,
+          49
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 66,
+        "title": "Implement TensionAnalyzer for vertex vote conflicts",
+        "description": "Create system to identify and quantify tensions between competing vertex analyses",
+        "details": "In omega_layer/kernel/tension_analyzer.py, implement TensionAnalyzer:\n- analyze_tensions() method compares each vertex pair for conflicts\n- Identifies specific tensions: Ledger wants to store everything but Garden wants to prune\n- Quantifies tension magnitude and provides resolution hints\n- Returns List[Tension] objects with vertex pairs, dimensions, magnitudes\n- These tensions drive cognitive growth - resolution IS development\n- Uses heuristics and pattern matching to detect common tension types",
+        "testStrategy": "Unit test with crafted conflicting votes. Verify tensions are detected correctly and magnitudes are reasonable.",
+        "priority": "medium",
+        "dependencies": [
+          49
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 67,
+        "title": "Implement MetabolicKernel central synthesizer",
+        "description": "Create the central orchestrator that resolves vertex tensions and produces unified understanding",
+        "details": "In omega_layer/kernel/metabolic_kernel.py, implement MetabolicKernel:\n- negotiate_experience() method routes experience through full Pentagram cycle\n- Runs Ledger+Garden+Mirror+Compass in parallel, then Orchestra after others complete\n- Uses LLM to synthesize competing votes into coherent resolution\n- Identifies tensions, finds resolution honoring all 5 perspectives\n- Calculates growth indicators and identity updates\n- Returns PentagramResult with all votes, synthesis, metrics\n- Target latency < 3 seconds per interaction",
+        "testStrategy": "Integration test with mocked or real LLM. Verify full cycle completes and returns valid PentagramResult. Test latency requirements.",
+        "priority": "high",
+        "dependencies": [
+          61,
+          62,
+          63,
+          64,
+          65,
+          66
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 68,
+        "title": "Implement end-to-end Pentagram cycle validation",
+        "description": "Create comprehensive test to validate complete Pentagram processing with varied inputs",
+        "details": "Create integration test that:\n- Sends varied test messages (technical discussion, casual chat, philosophical conversation)\n- Verifies all 5 vertices produce valid votes for each input\n- Confirms kernel synthesis resolves tensions appropriately\n- Validates PentagramResult structure and content quality\n- Tests both domain-agnostic processing and meaningful output generation\n- Measures and validates processing latency\n- Logs detailed execution flow for debugging",
+        "testStrategy": "End-to-end integration test with real or high-quality mocked LLM responses. Test with at least 5 different conversation types.",
+        "priority": "high",
+        "dependencies": [
+          67
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2026-02-09T16:00:57.521Z",
+      "updated": "2026-02-09T16:11:02.960Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
