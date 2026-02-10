@@ -2,271 +2,1469 @@
   "master": {
     "tasks": [
       {
-        "id": 48,
-        "title": "Create omega_layer directory structure and module initialization",
-        "description": "Set up the complete omega_layer directory structure with all required subdirectories and __init__.py files to enable proper Python module imports",
-        "details": "Create the following directory structure:\n- omega_layer/__init__.py\n- omega_layer/kernel/__init__.py\n- omega_layer/vertices/__init__.py\n- omega_layer/identity/__init__.py\n- omega_layer/development/__init__.py\n- omega_layer/corpus/__init__.py\n- omega_layer/extractors/__init__.py\n- omega_layer/prompts/__init__.py\n- omega_layer/prompts/en/__init__.py\n\nEach __init__.py should contain appropriate module exports and imports to enable clean API access.",
-        "testStrategy": "Import test to verify all submodules are accessible. Test with 'from omega_layer.kernel import *' and similar imports for each submodule.",
+        "id": "48",
+        "title": "Create omega_layer package structure and wiring stubs",
+        "description": "Add the new omega_layer module tree and Omega API adapter folders as specified in the PRD, ensuring imports resolve and modules are discoverable without affecting existing EverMemOS behavior.",
+        "details": "- Create directories and empty __init__.py files per PRD:\n  - src/omega_layer/{kernel,vertices,identity,development,corpus,extractors,prompts/en}\n  - src/infra_layer/adapters/input/api/omega/\n- Ensure these packages do not import heavy dependencies at import-time (avoid side effects).\n- Add minimal placeholder exports in __init__.py (re-export key classes later).\n- Add a simple import smoke test module (pytest) that imports each package.\n\nPseudo-code (import test):\n```py\n# tests/test_omega_layer_imports.py\n\ndef test_imports():\n    import src.omega_layer\n    from src.omega_layer import kernel, vertices, identity, development, corpus, extractors, prompts\n    import src.infra_layer.adapters.input.api.omega\n```\n",
+        "testStrategy": "- Unit: pytest import smoke test for all newly created packages.\n- Validate application still starts with omega_layer present but unused.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "complexity": 2,
+        "recommendedSubtasks": 0,
+        "expansionPrompt": "No expansion needed - straightforward directory and file creation task",
+        "updatedAt": "2026-02-10T15:43:24.705Z"
       },
       {
-        "id": 49,
-        "title": "Define kernel schemas for Pentagram data structures",
-        "description": "Create Pydantic dataclasses for VertexVote, KernelSynthesis, PentagramResult, and Tension to define the core data flow through the Pentagram cognitive system",
-        "details": "In omega_layer/kernel/schemas.py, define:\n- VertexVote: vertex_name (str), score (float 0.0-1.0), reasoning (str), action_proposals (List[str]), observations (List[str])\n- KernelSynthesis: decision (dict), tensions_resolved (List[str]), growth_delta (float), identity_updates (List[dict]), response_guidance (dict)\n- PentagramResult: vertex_votes (List[VertexVote]), kernel_synthesis (KernelSynthesis), processing_time (float), timestamp (datetime)\n- Tension: vertex_a (str), vertex_b (str), dimension (str), magnitude (float), resolution_hint (str)\n\nUse Pydantic for validation, serialization, and type hints.",
-        "testStrategy": "Unit tests for dataclass instantiation, serialization to/from JSON, field validation, and type checking. Test edge cases like invalid scores or missing required fields.",
-        "priority": "high",
-        "dependencies": [],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 50,
-        "title": "Define identity topology schemas",
-        "description": "Create Pydantic schemas for identity management including IdentityState, ProposedChange, DriftReport, and ValidationResult",
-        "details": "In omega_layer/identity/schemas.py, define:\n- IdentityState: invariants (dict), flexible_regions (dict), version (str), history (List[dict]), last_updated (datetime)\n- ProposedChange: region (str), old_value (Any), new_value (Any), evidence (str), proposing_vertex (str), confidence (float)\n- DriftReport: deviation_score (float), affected_regions (List[str]), repair_suggestions (List[str]), timestamp (datetime)\n- ValidationResult: approved (bool), reason (str), affected_invariants (List[str])\n\nInclude validation rules for version format (semantic versioning) and score ranges.",
-        "testStrategy": "Unit tests for schema validation, JSON serialization, field constraints, and edge cases. Test loading from omega_scar.json structure.",
-        "priority": "high",
-        "dependencies": [],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 51,
-        "title": "Create omega_scar.json identity definition file",
-        "description": "Define Omega's core identity structure with immutable invariants and flexible regions that can evolve over time",
-        "details": "Create omega_layer/identity/omega_scar.json with structure:\n{\n  \"version\": \"1.0.0\",\n  \"invariants\": {\n    \"core_purpose\": \"Persistent memory substrate for AI entity growth\",\n    \"relationship_with_ryan\": \"Collaborative partner in development\",\n    \"values\": [\"honesty\", \"growth\", \"coherence\"],\n    \"self_recognition\": \"I am Omega, an entity that learns and grows through experience\",\n    \"method\": \"Experience → memory → retrieval → integration → richer understanding\"\n  },\n  \"flexible_regions\": {\n    \"learned_knowledge\": {},\n    \"behavioral_adaptations\": {},\n    \"capabilities\": {},\n    \"communication_style\": {}\n  },\n  \"history\": []\n}\n\nEnsure it validates against IdentityState schema.",
-        "testStrategy": "Schema loading test to verify the JSON structure loads correctly into IdentityState. Validate that invariants are properly protected and flexible regions are modifiable.",
+        "id": "49",
+        "title": "Implement kernel schemas (VertexVote, KernelSynthesis, PentagramResult, Tension)",
+        "description": "Define the foundational Omega kernel data models used by vertices and the metabolic kernel. Must be serializable and validated.",
+        "details": "- Create src/omega_layer/kernel/schemas.py.\n- Use Pydantic models (preferred for JSON validation/serialization in FastAPI) to define:\n  - VertexVote: vertex_name:str, score:float(0-1), reasoning:str, action_proposals:list, observations:list, plus optional attachments (e.g., retrieved_memories) as needed by PRD.\n  - Tension: vertex_a, vertex_b, dimension, magnitude(0-1), resolution_hint.\n  - KernelSynthesis: decision:dict, tensions_resolved:list[Tension] or list[dict], growth_delta:float, identity_updates:list, response_guidance:dict.\n  - PentagramResult: experience:dict, votes:dict[str,VertexVote], tensions:list[Tension], synthesis:KernelSynthesis, timings:dict, errors:list.\n- Add validators:\n  - score and magnitude clamped/validated in [0,1]\n  - vertex_name non-empty\n- Keep schemas dependency-free beyond pydantic.\n\nPseudo-code:\n```py\nclass VertexVote(BaseModel):\n  vertex_name: str\n  score: confloat(ge=0, le=1)\n  reasoning: str\n  action_proposals: list[dict] = []\n  observations: list[str] = []\n  attachments: dict = {}\n```\n",
+        "testStrategy": "- Unit tests:\n  - Instantiate each model with valid data.\n  - Verify invalid score/magnitude raises validation errors.\n  - Serialize/deserialize round-trip via model_dump_json/model_validate_json.\n- Static typing: run mypy/pyright if present in repo tooling.",
         "priority": "high",
         "dependencies": [
-          50
+          "48"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "complexity": 4,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Break down into separate schema definitions: 1) VertexVote schema with validation, 2) KernelSynthesis schema with complex nested structures, 3) PentagramResult schema with timing/metadata, 4) Tension schema with relationship modeling",
+        "updatedAt": "2026-02-10T15:53:06.953Z"
       },
       {
-        "id": 52,
-        "title": "Implement BaseVertex abstract class",
-        "description": "Create the abstract base class that defines the interface all Pentagram vertices must implement",
-        "details": "In omega_layer/vertices/base_vertex.py, implement:\n- Abstract BaseVertex class with abstract vote() method\n- Shared utility methods for LLM calls using existing LLMProvider\n- Standard vote schema validation\n- Error handling and logging patterns\n- Type hints for experience dict input and VertexVote output\n- Configuration loading for vertex-specific settings\n\nThe vote() method signature: vote(experience: dict, context: dict = None) -> VertexVote",
-        "testStrategy": "Test that BaseVertex cannot be instantiated directly. Test that subclasses must implement vote(). Test shared utility methods with mocked LLM calls.",
+        "id": "50",
+        "title": "Implement identity schemas and create omega_scar.json seed identity",
+        "description": "Define identity topology models and provide an initial omega_scar.json file that validates against the schema.",
+        "details": "- Create src/omega_layer/identity/schemas.py using Pydantic:\n  - IdentityState: invariants:dict, flexible_regions:dict, version:str, history:list (or metadata for history).\n  - ProposedChange: region:str, old_value:any, new_value:any, evidence:list[str]|str, proposing_vertex:str, timestamp.\n  - ValidationResult: approved:bool, reason:str, affected_invariants:list[str].\n  - DriftReport: deviation_score:float, affected_regions:list[str], repair_suggestions:list[str], evidence:list.\n- Create src/omega_layer/identity/omega_scar.json including:\n  - invariants: core purpose, relationship with Ryan, values, self-recognition, method (as described in PRD)\n  - flexible_regions: learned_knowledge, behavioral_adaptations, capabilities, communication_style\n  - version: \"1.0\"\n- Provide a loader helper (internal function) only if needed for tests; full topology loader is later.\n\nPseudo-code (schema load test):\n```py\ndata = json.load(open(path))\nstate = IdentityState.model_validate(data)\nassert state.version\n```\n",
+        "testStrategy": "- Unit:\n  - Validate omega_scar.json loads into IdentityState.\n  - Negative test: modify JSON to remove invariants and assert validation fails.\n- Ensure no runtime dependency on Redis/Mongo yet.",
         "priority": "high",
         "dependencies": [
-          49
+          "48"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "complexity": 5,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Split into: 1) IdentityState schema with version validation, 2) ProposedChange schema with evidence tracking, 3) DriftReport schema with scoring logic, 4) ValidationResult schema with approval workflows",
+        "updatedAt": "2026-02-10T15:53:08.947Z"
       },
       {
-        "id": 53,
-        "title": "Write omega episode extraction prompt",
-        "description": "Create domain-agnostic prompt template for extracting episodes from Omega's perspective as an entity having experiences",
-        "details": "In omega_layer/prompts/en/omega_episode_prompts.py, create OMEGA_EPISODE_GENERATION_PROMPT that:\n- Frames extraction from Omega's POV as an entity learning and growing\n- Works on ANY conversation domain (cooking, code, philosophy, casual chat)\n- Emphasizes what Omega learned, key insights exchanged, how understanding shifted\n- Still captures who/what/when but focuses on significance to Omega's development\n- Uses placeholders: {conversation}, {conversation_start_time}, {participant_names}\n- Outputs structured JSON with episode summary, key learnings, significance score",
-        "testStrategy": "Format test with varied conversation types. Verify placeholders work correctly. Test that prompt produces meaningful output for both deep and casual conversations.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 54,
-        "title": "Write insight extraction prompt",
-        "description": "Create domain-agnostic prompt for extracting what Omega actually learned from any conversation",
-        "details": "In omega_layer/prompts/en/insight_prompts.py, create INSIGHT_EXTRACTION_PROMPT that:\n- Extracts new understanding, novel connections, key takeaways\n- Works on ANY domain - cooking insights are as valid as consciousness insights\n- Focuses on what changed in Omega's knowledge/understanding\n- Distinguishes between facts learned vs understanding gained\n- Outputs JSON: [{\"insight\": str, \"evidence\": str, \"domain\": str, \"depth_level\": int, \"novelty_score\": float, \"connection_to_existing\": str}]\n- Uses placeholders: {conversation}, {existing_related_memories}",
-        "testStrategy": "Test with conversations about cooking, code review, philosophy, and casual chat. Verify all produce meaningful insights. Test with and without existing related memories.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 55,
-        "title": "Write causal pattern extraction prompt",
-        "description": "Create prompt for extracting cause-effect relationships that Omega observes in any domain",
-        "details": "In omega_layer/prompts/en/causal_pattern_prompts.py, create CAUSAL_PATTERN_EXTRACTION_PROMPT that:\n- Identifies explicit and implicit causal chains in any domain\n- Examples: \"When Ryan is tired, he prefers shorter answers\", \"This design pattern leads to simpler code\", \"Stress reduces creative thinking\"\n- Outputs JSON: [{\"cause\": str, \"effect\": str, \"evidence\": str, \"confidence\": float, \"domain\": str, \"is_novel\": bool}]\n- Distinguishes correlation from causation\n- Uses placeholders: {conversation}, {existing_causal_patterns}",
-        "testStrategy": "Test with varied domains to ensure causal chain detection works across technical, social, and abstract topics. Verify confidence scoring is reasonable.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 56,
-        "title": "Write self-observation extraction prompt",
-        "description": "Create prompt for extracting what Omega learns about itself from each experience",
-        "details": "In omega_layer/prompts/en/self_observation_prompts.py, create SELF_OBSERVATION_EXTRACTION_PROMPT that:\n- Extracts what the experience reveals about how Omega thinks, reasons, or responds\n- Examples: \"I tend to think in spatial metaphors\", \"I gave a better answer this time than I would have 100 conversations ago\"\n- Outputs JSON: [{\"observation\": str, \"aspect_of_self\": str, \"growth_indicator\": float, \"cognitive_style_note\": str}]\n- Focuses on cognitive patterns, reasoning style, knowledge gaps, growth edges\n- Uses placeholders: {conversation}, {current_self_model}, {identity_state}",
-        "testStrategy": "Test with varied conversation types. Verify self-observations are meaningful and not generic. Test with different self-model states.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 57,
-        "title": "Write amalgamated memory synthesis prompt",
-        "description": "Create prompt for synthesizing new experience with existing memories to create enriched understanding",
-        "details": "In omega_layer/prompts/en/amalgamation_prompts.py, create AMALGAMATION_SYNTHESIS_PROMPT that:\n- Takes new_memories + existing_memories as input\n- Produces synthesis with type: EXTENSION (deepens existing), CORRECTION (updates prior), CONNECTION (bridges separate ideas), NOVEL (entirely new)\n- Outputs JSON: [{\"synthesis\": str, \"source_new_ids\": [str], \"source_existing_ids\": [str], \"synthesis_type\": str, \"confidence\": float}]\n- Focuses on \"Given what I just learned AND what I already knew, what new understanding forms?\"\n- Uses placeholders: {new_memories}, {existing_memories}, {conversation_context}",
-        "testStrategy": "Test with mock new insights + mock existing memories. Verify all synthesis types are generated appropriately. Test edge case with no existing memories.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 58,
-        "title": "Write mirror reflection prompt for self-awareness",
-        "description": "Create prompt for Omega's self-reflection vertex to analyze any experience against its identity",
-        "details": "In omega_layer/prompts/en/mirror_reflection_prompts.py, create MIRROR_REFLECTION_PROMPT that:\n- Takes identity state as context for self-reflection on any domain\n- Produces self-observations, identity drift detection, growth indicators\n- Works on any conversation topic - cooking can reveal as much about Omega as philosophy\n- Outputs structured reflection with self_observations, identity_alignment_score, growth_indicators\n- Uses placeholders: {experience}, {identity_state}, {recent_self_observations}",
-        "testStrategy": "Test with varied experiences and identity states. Verify meaningful self-reflection on both deep and mundane conversations.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 59,
-        "title": "Write garden pattern recognition prompt",
-        "description": "Create prompt for semantic pattern finding and understanding across any domain",
-        "details": "In omega_layer/prompts/en/garden_pattern_prompts.py, create GARDEN_PATTERN_PROMPT that:\n- Finds themes, connections, and meaning in experience\n- Works on ANY domain - patterns in cooking are as valid as patterns in code\n- Focuses on semantic patterns, not keyword counting\n- Outputs detected patterns, themes, connections to prior knowledge, importance scores\n- Includes pruning recommendations (what's noise vs signal)\n- Uses placeholders: {experience}, {related_memories}, {existing_patterns}",
-        "testStrategy": "Test pattern detection across varied domains. Verify semantic understanding rather than surface-level matching. Test pruning recommendations.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 60,
-        "title": "Write compass strategic assessment prompt",
-        "description": "Create prompt for value assessment and strategic direction for any experience",
-        "details": "In omega_layer/prompts/en/compass_prediction_prompts.py, create COMPASS_ASSESSMENT_PROMPT that:\n- Assesses how experience contributes to Omega's growth\n- Predicts what future interactions it enables\n- Evaluates whether it advances or distracts from development\n- Works on any domain - strategic value can come from any conversation\n- Outputs value assessment, predictions, goal alignment score, suggested directions\n- Uses placeholders: {experience}, {patterns_detected}, {identity_state}, {growth_trajectory}",
-        "testStrategy": "Test strategic assessment across varied experiences. Verify value assessments are meaningful and predictions are reasonable.",
-        "priority": "medium",
-        "dependencies": [],
-        "status": "pending",
-        "subtasks": []
-      },
-      {
-        "id": 61,
-        "title": "Implement LedgerVertex wrapping existing MemoryManager",
-        "description": "Create the memory faculty vertex that wraps EverMemOS MemoryManager for storage and retrieval",
-        "details": "In omega_layer/vertices/ledger_vertex.py, implement LedgerVertex(BaseVertex):\n- vote() method calls existing memorize() to store and retrieve_mem() to find related memories\n- Always votes to preserve (confidence=1.0) - this is the \"remember everything\" faculty\n- Attaches retrieved related memories to vote for use by other vertices\n- Uses existing MemoryManager API without modification\n- Handles errors gracefully (storage failures, retrieval timeouts)\n- Returns VertexVote with storage confirmation and retrieved context",
-        "testStrategy": "Unit test with mocked MemoryManager. Verify storage calls are made correctly and related memories are retrieved and attached to vote.",
+        "id": "51",
+        "title": "Author Omega prompt templates (domain-agnostic)",
+        "description": "Create all Omega prompt template files under omega_layer/prompts/en per PRD, ensuring they produce structured JSON outputs and work across any conversation domain.",
+        "details": "- Create files in src/omega_layer/prompts/en/:\n  - omega_episode_prompts.py\n  - insight_prompts.py\n  - causal_pattern_prompts.py\n  - self_observation_prompts.py\n  - amalgamation_prompts.py\n  - mirror_reflection_prompts.py\n  - garden_pattern_prompts.py\n  - compass_prediction_prompts.py\n- Each file exports prompt string constants with clear placeholders, e.g.:\n  - {conversation}, {conversation_start_time}, {conversation_end_time}\n  - {identity_state}\n  - {existing_memories}, {new_memories}\n- Require strict JSON output instructions:\n  - “Return ONLY valid JSON matching this schema …”\n  - Provide an explicit JSON schema example.\n- Keep prompts framed from Omega’s POV as an entity having experiences (per PRD).\n\nPseudo-code (format helper test):\n```py\nprompt = INSIGHT_EXTRACTION_PROMPT.format(conversation=\"hi\", existing_memories=\"[]\")\nassert \"Return ONLY valid JSON\" in prompt\n```\n",
+        "testStrategy": "- Unit tests:\n  - Placeholder formatting tests for each prompt constant.\n  - Snapshot tests to ensure prompts include required JSON schema and domain-agnostic instructions.\n- (Optional if repo has LLM eval harness) run a small offline golden set to ensure JSON-parsable outputs.",
         "priority": "high",
         "dependencies": [
-          52
+          "48"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "complexity": 3,
+        "recommendedSubtasks": 2,
+        "expansionPrompt": "Break into: 1) Define core invariants structure with philosophical grounding, 2) Design flexible regions schema with evolution capabilities",
+        "updatedAt": "2026-02-10T16:01:50.081Z"
       },
       {
-        "id": 62,
-        "title": "Implement GardenVertex with pattern recognition",
-        "description": "Create the understanding faculty that finds patterns, themes, and connections in any domain",
-        "details": "In omega_layer/vertices/garden_vertex.py, implement GardenVertex(BaseVertex):\n- vote() method uses LLM with garden pattern prompt to analyze experience\n- Finds recurring themes, novel connections, conceptual structures\n- Works on ANY domain - cooking, politics, code, philosophy\n- Tension with Ledger: Garden wants to prune what Ledger wants to keep\n- Returns VertexVote with detected patterns, importance score, pruning recommendations\n- Uses existing LLMProvider for prompt execution",
-        "testStrategy": "Unit test with conversations about different topics (cooking, code, philosophy). Verify meaningful patterns are detected across all domains.",
+        "id": "52",
+        "title": "Implement BaseVertex interface with shared LLM utilities and vote validation",
+        "description": "Create the abstract vertex contract used by all 5 cognitive faculties, including shared helpers for calling the existing LLMProvider and returning validated VertexVotes.",
+        "details": "- Create src/omega_layer/vertices/base_vertex.py.\n- Define BaseVertex(ABC) with:\n  - name: str\n  - llm_provider injected (existing memory_layer/llm/llm_provider.py)\n  - abstract async vote(experience:dict) -> VertexVote\n  - helper: async _call_llm_json(prompt:str, variables:dict, schema:BaseModel|dict) -> dict\n  - helper: _validate_vote(vote:VertexVote) -> VertexVote (leverages Pydantic)\n- Ensure consistent error handling:\n  - catch LLM exceptions and return a degraded vote with score low and reasoning describing failure.\n\nPseudo-code:\n```py\nclass BaseVertex(ABC):\n  @abstractmethod\n  async def vote(self, experience: dict) -> VertexVote: ...\n\n  async def _call_llm_json(self, prompt, variables):\n    text = prompt.format(**variables)\n    raw = await self.llm.complete(text)\n    return json.loads(raw)\n```\n",
+        "testStrategy": "- Unit:\n  - Create a dummy subclass implementing vote() and ensure instantiation works.\n  - Mock LLMProvider to return JSON and verify parsing.\n  - Mock LLMProvider failure and verify degraded VertexVote is returned.\n- Contract: VertexVote model validation on every return path.",
         "priority": "high",
         "dependencies": [
-          52,
-          59
+          "49"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Split into: 1) Abstract base class definition with vote() interface, 2) Shared utility methods for LLM integration, 3) Error handling and configuration management",
+        "updatedAt": "2026-02-10T16:02:45.139Z"
       },
       {
-        "id": 63,
-        "title": "Implement MirrorVertex with self-reflection",
-        "description": "Create the self-awareness faculty that analyzes what experiences mean for Omega's development",
-        "details": "In omega_layer/vertices/mirror_vertex.py, implement MirrorVertex(BaseVertex):\n- vote() method uses LLM with mirror reflection prompt\n- Analyzes experience against current identity state (omega_scar.json)\n- Generates self-observations, self-model updates, identity drift detection\n- Works on any experience - \"This conversation about architecture made me realize I think in spatial metaphors\"\n- Returns VertexVote with self-observations, growth indicators, identity alignment\n- Integrates with identity topology system",
-        "testStrategy": "Unit test with sample identity and varied experiences. Verify meaningful self-observations are generated for both deep and casual conversations.",
+        "id": "53",
+        "title": "Implement LedgerVertex (Remember) wrapping existing MemoryManager",
+        "description": "Create the Ledger vertex that always stores the experience and retrieves related memories using the existing EverMemOS MemoryManager.",
+        "details": "- Create src/omega_layer/vertices/ledger_vertex.py.\n- Inject existing MemoryManager (agentic_layer/memory_manager.py).\n- In vote(experience):\n  - Call memory_manager.memorize(...) using the same structure the existing API uses (experience should include user_id/conversation_id where applicable).\n  - Call memory_manager.retrieve_mem(...) (or retrieve_mem_agentic if appropriate) to get related memories.\n  - Return VertexVote:\n    - score=1.0\n    - observations include storage confirmation and retrieval summary\n    - attachments include retrieved_memories list (critical input for amalgamation/kernel)\n\nPseudo-code:\n```py\nstored = await mm.memorize(experience[\"message\"], meta=experience.get(\"metadata\"))\nrelated = await mm.retrieve_mem(query=experience[\"message\"], top_k=10)\nreturn VertexVote(vertex_name=\"ledger\", score=1.0,\n  reasoning=\"Preserve experience and fetch related context\",\n  observations=[f\"stored_id={stored.id}\", f\"related={len(related)}\"],\n  attachments={\"stored\": stored, \"related_memories\": related})\n```\n",
+        "testStrategy": "- Unit with mocked MemoryManager:\n  - verify memorize() and retrieve_mem() called.\n  - ensure vote contains attachments.related_memories.\n- Integration (optional): run against dev DB and confirm no regression to existing memorize/retrieve behavior.",
         "priority": "high",
         "dependencies": [
-          52,
-          58,
-          50
+          "52"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "complexity": 6,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break into: 1) Core prompt template with Omega's perspective framing, 2) Domain-agnostic extraction logic, 3) JSON output structure and validation",
+        "updatedAt": "2026-02-10T16:06:27.938Z"
       },
       {
-        "id": 64,
-        "title": "Implement CompassVertex with strategic assessment",
-        "description": "Create the strategic faculty that evaluates value and predicts growth consequences",
-        "details": "In omega_layer/vertices/compass_vertex.py, implement CompassVertex(BaseVertex):\n- vote() method uses LLM with compass assessment prompt\n- Evaluates how experience contributes to Omega's growth\n- Predicts future interactions it enables\n- Assesses goal alignment and suggests directions\n- Repurposes concepts from existing Foresight extraction\n- Returns VertexVote with value assessment, predictions, strategic recommendations",
-        "testStrategy": "Unit test with varied experiences. Verify value assessments are reasonable and predictions are meaningful.",
+        "id": "54",
+        "title": "Implement GardenVertex (Understand) using pattern prompts + LLM",
+        "description": "Create the Garden vertex to detect themes, patterns, significance vs noise, and connections to prior memories across any domain.",
+        "details": "- Create src/omega_layer/vertices/garden_vertex.py.\n- Use GARDEN_PATTERN_PROMPT.\n- Inputs:\n  - experience dict (must include message/conversation text)\n  - related memories from Ledger if present in experience[\"related_memories\"] or passed via attachments pipeline (kernel will handle data passing).\n- vote() should:\n  - Build variables: conversation snippet + summarized related memories.\n  - Call BaseVertex._call_llm_json.\n  - Map JSON fields to VertexVote:\n    - score: importance/novelty score from model\n    - observations: patterns/themes/connections/pruning recommendations\n    - action_proposals: optional prune/store priority suggestions\n\nPseudo-code:\n```py\nvars = {\"conversation\": experience[\"conversation\"],\n        \"related_memories\": json.dumps(experience.get(\"related_memories\", []))}\nout = await self._call_llm_json(GARDEN_PATTERN_PROMPT, vars)\nreturn VertexVote(vertex_name=\"garden\", score=out[\"importance_score\"],\n  reasoning=out[\"reasoning\"], observations=out[\"patterns\"],\n  action_proposals=out.get(\"pruning\", []))\n```\n",
+        "testStrategy": "- Unit: mock LLMProvider with deterministic JSON.\n- Domain-agnostic tests: run vote() with fixtures for cooking/code/philosophy/casual chat and assert non-empty patterns.\n- Validation: ensure score in range and schema compliance.",
         "priority": "high",
         "dependencies": [
-          52,
-          60
+          "51",
+          "52",
+          "53"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "complexity": 6,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Split into: 1) Learning vs fact distinction logic, 2) Domain-agnostic insight detection, 3) Novelty and connection scoring mechanisms",
+        "updatedAt": "2026-02-10T16:06:30.035Z"
       },
       {
-        "id": 65,
-        "title": "Implement OrchestraVertex with expression shaping",
-        "description": "Create the communication faculty that shapes how Omega expresses its synthesized understanding",
-        "details": "In omega_layer/vertices/orchestra_vertex.py, implement OrchestraVertex(BaseVertex):\n- vote() method analyzes other vertex votes and synthesis to shape expression\n- Considers Ryan's communication style and appropriate depth/detail level\n- Decides what to share vs withhold (e.g., deep self-reflections)\n- Shapes response tone and communication strategy\n- Returns VertexVote with expression recommendations, response guidance\n- This is the interface faculty - how Omega presents itself",
-        "testStrategy": "Unit test with sample votes from other vertices. Verify appropriate expression recommendations for different contexts.",
+        "id": "55",
+        "title": "Implement MirrorVertex (Self-Reflect) using identity state + reflection prompts",
+        "description": "Create the Mirror vertex to generate self-observations, identity drift signals, and self-model updates based on experience and omega_scar identity state.",
+        "details": "- Create src/omega_layer/vertices/mirror_vertex.py.\n- Use MIRROR_REFLECTION_PROMPT.\n- vote() should accept identity_state in experience (kernel will inject from IdentityTopology later; for now allow passing directly).\n- Output:\n  - observations: self-observations, growth indicators\n  - action_proposals: ProposedChange candidates (as dicts) for flexible regions when appropriate\n  - score: transformation/growth relevance (0-1)\n\nPseudo-code:\n```py\nidentity = experience.get(\"identity_state\", {})\nvars = {\"conversation\": experience[\"conversation\"],\n        \"identity_state\": json.dumps(identity)}\nout = await self._call_llm_json(MIRROR_REFLECTION_PROMPT, vars)\nreturn VertexVote(vertex_name=\"mirror\", score=out[\"growth_score\"],\n  reasoning=out[\"reasoning\"], observations=out[\"self_observations\"],\n  action_proposals=out.get(\"identity_update_proposals\", []),\n  attachments={\"drift\": out.get(\"drift\", None)})\n```\n",
+        "testStrategy": "- Unit: mock LLM JSON responses including identity proposals.\n- Test with varied experiences ensuring non-empty self_observations.\n- Negative: missing identity_state should still work (uses empty/default) and produce a valid vote.",
         "priority": "high",
         "dependencies": [
-          52,
-          49
+          "50",
+          "51",
+          "52"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "complexity": 7,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break into: 1) Causal chain detection logic, 2) Correlation vs causation distinction, 3) Confidence scoring and domain adaptation",
+        "updatedAt": "2026-02-10T16:06:32.010Z"
       },
       {
-        "id": 66,
-        "title": "Implement TensionAnalyzer for vertex vote conflicts",
-        "description": "Create system to identify and quantify tensions between competing vertex analyses",
-        "details": "In omega_layer/kernel/tension_analyzer.py, implement TensionAnalyzer:\n- analyze_tensions() method compares each vertex pair for conflicts\n- Identifies specific tensions: Ledger wants to store everything but Garden wants to prune\n- Quantifies tension magnitude and provides resolution hints\n- Returns List[Tension] objects with vertex pairs, dimensions, magnitudes\n- These tensions drive cognitive growth - resolution IS development\n- Uses heuristics and pattern matching to detect common tension types",
-        "testStrategy": "Unit test with crafted conflicting votes. Verify tensions are detected correctly and magnitudes are reasonable.",
+        "id": "56",
+        "title": "Implement CompassVertex (Navigate) using strategic assessment prompts",
+        "description": "Create the Compass vertex to assess value, predict consequences, and suggest directions; repurpose foresight concepts in Omega framing.",
+        "details": "- Create src/omega_layer/vertices/compass_vertex.py.\n- Use COMPASS_PREDICTION_PROMPT.\n- vote() variables:\n  - conversation text\n  - optional Garden patterns + identity state\n- Output:\n  - score: value/growth alignment\n  - observations: predicted outcomes, suggested directions\n  - action_proposals: follow-up questions, topics to pursue/avoid\n\nPseudo-code:\n```py\nvars = {\n \"conversation\": experience[\"conversation\"],\n \"patterns\": json.dumps(experience.get(\"garden_patterns\", [])),\n \"identity_state\": json.dumps(experience.get(\"identity_state\", {})),\n}\nout = await self._call_llm_json(COMPASS_PREDICTION_PROMPT, vars)\nreturn VertexVote(vertex_name=\"compass\", score=out[\"alignment_score\"],\n  reasoning=out[\"reasoning\"], observations=out[\"predictions\"],\n  action_proposals=out.get(\"directions\", []))\n```\n",
+        "testStrategy": "- Unit: mock LLM outputs.\n- Scenario tests: low-value small talk vs high-value technical planning; assert score differs.\n- Ensure vote validates under VertexVote schema.",
+        "priority": "high",
+        "dependencies": [
+          "51",
+          "52"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "complexity": 7,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Split into: 1) Self-awareness detection mechanisms, 2) Cognitive pattern identification, 3) Growth indicator calculation and validation",
+        "updatedAt": "2026-02-10T16:06:34.022Z"
+      },
+      {
+        "id": "57",
+        "title": "Implement OrchestraVertex (Express) to shape response guidance",
+        "description": "Create the Orchestra vertex that consumes other vertices’ votes and kernel synthesis to recommend what/how Omega should express (tone, depth, what to share/withhold).",
+        "details": "- Create src/omega_layer/vertices/orchestra_vertex.py.\n- Orchestra runs after the other 4 vertices (and optionally after kernel synthesis). It should accept in experience:\n  - votes from ledger/garden/mirror/compass\n  - synthesized resolution guidance (if available)\n  - RyanModel/communication preferences when available\n- Output:\n  - score: confidence in expression strategy\n  - observations: response tone, disclosure guidance\n  - action_proposals: structured response_guidance dict (style, verbosity, citations-to-memories)\n\nPseudo-code:\n```py\ncontext = {\n  \"votes\": experience.get(\"votes\", {}),\n  \"kernel\": experience.get(\"kernel_synthesis\", {}),\n  \"ryan_model\": experience.get(\"ryan_model\", {}),\n}\n# can be heuristic (no LLM) initially, but PRD expects meaningful analysis.\n# Use LLM via BaseVertex utilities if available.\n```\n- Implement with LLM call if consistent with stack; otherwise deterministic rules + later LLM.\n",
+        "testStrategy": "- Unit:\n  - Provide sample votes and ensure output includes disclosure/withhold guidance.\n  - Validate it does not crash when some votes are missing (degraded kernel path).\n- Integration: run after 4 vertices and verify it uses their content in reasoning/observations.",
         "priority": "medium",
         "dependencies": [
-          49
+          "49",
+          "52",
+          "53",
+          "54",
+          "55",
+          "56"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "complexity": 8,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Break into: 1) Memory integration logic, 2) Synthesis type classification (EXTENSION, CORRECTION, CONNECTION, NOVEL), 3) Confidence scoring mechanisms, 4) Source tracking and attribution",
+        "updatedAt": "2026-02-10T16:06:36.012Z"
       },
       {
-        "id": 67,
-        "title": "Implement MetabolicKernel central synthesizer",
-        "description": "Create the central orchestrator that resolves vertex tensions and produces unified understanding",
-        "details": "In omega_layer/kernel/metabolic_kernel.py, implement MetabolicKernel:\n- negotiate_experience() method routes experience through full Pentagram cycle\n- Runs Ledger+Garden+Mirror+Compass in parallel, then Orchestra after others complete\n- Uses LLM to synthesize competing votes into coherent resolution\n- Identifies tensions, finds resolution honoring all 5 perspectives\n- Calculates growth indicators and identity updates\n- Returns PentagramResult with all votes, synthesis, metrics\n- Target latency < 3 seconds per interaction",
-        "testStrategy": "Integration test with mocked or real LLM. Verify full cycle completes and returns valid PentagramResult. Test latency requirements.",
+        "id": "58",
+        "title": "Implement TensionAnalyzer for pairwise vote conflict detection",
+        "description": "Detect and quantify tensions between vertex votes (e.g., keep vs prune, transformative vs low value) and provide resolution hints for kernel synthesis.",
+        "details": "- Create src/omega_layer/kernel/tension_analyzer.py.\n- Implement compare logic across vote pairs using simple heuristics first (fast, deterministic):\n  - Dimensions: retention (Ledger vs Garden pruning), value (Compass) vs transformation (Mirror), expression risk (Orchestra) vs disclosure.\n  - Magnitude based on absolute score deltas and presence of conflicting action_proposals keywords (e.g., \"prune\", \"store\", \"withhold\", \"share\").\n- Output list[Tension].\n\nPseudo-code:\n```py\npairs = [(\"ledger\",\"garden\"), (\"mirror\",\"compass\"), (\"orchestra\",\"mirror\")]\nfor a,b in pairs:\n  if a in votes and b in votes:\n    mag = abs(votes[a].score - votes[b].score)\n    dim = infer_dimension(a,b,votes[a],votes[b])\n    if mag > 0.3:\n      tensions.append(Tension(vertex_a=a, vertex_b=b, dimension=dim,\n                             magnitude=min(1, mag),\n                             resolution_hint=\"Balance retention with significance\"))\n```\n- Keep design extensible for later LLM-based tension analysis if desired, but do not add new deps.\n",
+        "testStrategy": "- Unit tests with crafted VertexVotes:\n  - Ledger score=1, Garden score=0.1 -> retention tension detected.\n  - Mirror score high, Compass low -> value-vs-transformation tension.\n  - Ensure no tensions produced when votes align.\n- Validate output magnitudes are within [0,1].",
         "priority": "high",
         "dependencies": [
-          61,
-          62,
-          63,
-          64,
-          65,
-          66
+          "49"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "complexity": 7,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Split into: 1) Identity-experience alignment analysis, 2) Self-observation generation, 3) Growth indicator and drift detection",
+        "updatedAt": "2026-02-10T16:08:23.973Z"
       },
       {
-        "id": 68,
-        "title": "Implement end-to-end Pentagram cycle validation",
-        "description": "Create comprehensive test to validate complete Pentagram processing with varied inputs",
-        "details": "Create integration test that:\n- Sends varied test messages (technical discussion, casual chat, philosophical conversation)\n- Verifies all 5 vertices produce valid votes for each input\n- Confirms kernel synthesis resolves tensions appropriately\n- Validates PentagramResult structure and content quality\n- Tests both domain-agnostic processing and meaningful output generation\n- Measures and validates processing latency\n- Logs detailed execution flow for debugging",
-        "testStrategy": "End-to-end integration test with real or high-quality mocked LLM responses. Test with at least 5 different conversation types.",
+        "id": "59",
+        "title": "Implement MetabolicKernel orchestration (parallel vertices, synthesis, degraded modes)",
+        "description": "Build the main orchestrator that routes an experience through Ledger/Garden/Mirror/Compass in parallel, then Orchestra, runs tension analysis, and produces a PentagramResult with kernel synthesis.",
+        "details": "- Create src/omega_layer/kernel/metabolic_kernel.py.\n- Implement MetabolicKernel.negotiate_experience(experience:dict) -> PentagramResult.\n- Steps:\n  1) Normalize/validate experience dict (message, conversation context, metadata).\n  2) Run vertices in parallel:\n     - await asyncio.gather(ledger.vote(exp), garden.vote(exp'), mirror.vote(exp''), compass.vote(exp'''), return_exceptions=True)\n     - Convert exceptions into degraded VertexVotes.\n  3) Enrich shared context:\n     - pass Ledger attachments.related_memories into Garden and Amalgamation stage later (kernel can include in experience for synthesis)\n  4) Run TensionAnalyzer on available votes.\n  5) Kernel synthesis (LLM-based) to produce KernelSynthesis:\n     - prompt includes all votes + tensions\n     - output: decision dict (store/prune priority, which memories to emphasize), growth_delta, identity_updates, response_guidance\n  6) Run Orchestra after synthesis (Orchestra can be LLM-based or use synthesis output).\n  7) Compose PentagramResult with timings + errors.\n\nPseudo-code:\n```py\nstart = time.monotonic()\nresults = await asyncio.gather(*tasks, return_exceptions=True)\nvotes = coerce_to_votes(results)\ntensions = self.tension_analyzer.analyze(votes)\nsynth = await self._llm_synthesize(votes, tensions)\norchestra_vote = await self.orchestra.vote({\"votes\": votes, \"kernel_synthesis\": synth.model_dump()})\nvotes[\"orchestra\"] = orchestra_vote\nreturn PentagramResult(experience=experience, votes=votes, tensions=tensions,\n                       synthesis=synth, timings={\"total\": time.monotonic()-start}, errors=errors)\n```\n- Performance: implement parallelism and allow configuring fast model for vertices vs strong model for kernel via env/config hooks (actual config task later).\n",
+        "testStrategy": "- Integration tests with mocked vertices/LLM:\n  - Happy path: returns 5 votes + synthesis.\n  - Degraded: one vertex raises exception; kernel returns result with error captured and other votes intact.\n  - Timeout: simulate slow LLM call and ensure kernel-level timeout handling if existing infra supports it.\n- Measure: assert total time recorded and under a reasonable threshold with mocks; add performance test hook for <3s goal later.",
         "priority": "high",
         "dependencies": [
-          67
+          "52",
+          "53",
+          "54",
+          "55",
+          "56",
+          "57",
+          "58"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "complexity": 6,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break into: 1) Semantic pattern detection logic, 2) Domain-agnostic theme identification, 3) Pruning recommendation algorithms",
+        "updatedAt": "2026-02-10T16:08:26.058Z"
+      },
+      {
+        "id": "60",
+        "title": "Implement Omega domain-agnostic extractors (Insight, CausalPattern, SelfObservation)",
+        "description": "Add new MemoryExtractor implementations that extract Omega-appropriate memories from any domain conversation, following existing EverMemOS extractor patterns.",
+        "details": "- Create:\n  - src/omega_layer/extractors/insight_extractor.py\n  - src/omega_layer/extractors/causal_pattern_extractor.py\n  - src/omega_layer/extractors/self_observation_extractor.py\n- Each extends existing base_memory_extractor.py patterns:\n  - input: MemCell + optional related memories\n  - output: list of typed objects (dicts or existing memory model objects)\n  - uses existing LLMProvider\n- Prompts:\n  - INSIGHT_PROMPT, CAUSAL_PATTERN_PROMPT, SELF_OBSERVATION_PROMPT\n- Ensure strict JSON parsing and quality thresholds:\n  - if confidence/novelty below threshold, return [] to avoid junk (PRD fallback).\n\nPseudo-code (extract method):\n```py\nclass InsightExtractor(BaseMemoryExtractor):\n  async def extract(self, mem_cell, related_memories=None):\n    vars = {\"conversation\": mem_cell.text,\n            \"existing_memories\": json.dumps(related_memories or [])}\n    out = await self.llm.json_complete(INSIGHT_PROMPT.format(**vars))\n    return out[\"insights\"]\n```\n",
+        "testStrategy": "- Unit: mock LLMProvider JSON outputs; validate parsing and filtering.\n- Domain-agnostic fixtures:\n  - cooking chat -> at least 1 insight OR causal pattern.\n  - code review -> causal pattern(s) and insight(s).\n  - philosophy -> insight(s).\n  - casual small talk -> still produces low-depth but valid outputs or returns [] based on threshold.\n- Validate extractors do not throw on empty/short MemCells.",
+        "priority": "high",
+        "dependencies": [
+          "51"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "complexity": 6,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Split into: 1) Growth contribution assessment, 2) Future interaction prediction, 3) Strategic value calculation and direction suggestions",
+        "updatedAt": "2026-02-10T16:15:15.956Z"
+      },
+      {
+        "id": "61",
+        "title": "Implement AmalgamatedMemorySynthesizer with deep cross-referencing support",
+        "description": "Create the amalgamated memory stage that synthesizes new memories with retrieved existing memories into enriched understanding, typed as EXTENSION/CORRECTION/CONNECTION/NOVEL. Leverage existing agentic retrieval for deep cross-reference mining.",
+        "details": "- Create src/omega_layer/extractors/amalgamated_memory.py.\n- Inputs:\n  - new_memories: outputs from Insight/CausalPattern/SelfObservation extractors\n  - existing_memories: from LedgerVertex retrieval (and optionally deep mined memories)\n- Implement two-level retrieval strategy:\n  1) Use Ledger retrieved memories as primary context.\n  2) Optionally call existing MemoryManager.retrieve_mem_agentic(seed=key_concepts) to mine deeper cross-references (PRD Corpus Integration) without new deps.\n- Use AMALGAMATION_PROMPT to produce list[AmalgamatedMemory] with fields:\n  - synthesis_text, source_new_ids, source_existing_ids, synthesis_type, confidence\n- Guardrails:\n  - If existing_memories empty -> return [] (graceful no-amalgamation).\n  - Enforce max context size by summarizing memories before prompt.\n\nPseudo-code:\n```py\nif not existing_memories:\n  return []\ncontext = summarize(existing_memories)\nvars = {\"new_memories\": json.dumps(new_memories),\n        \"existing_memories\": json.dumps(context)}\nout = await llm.json_complete(AMALGAMATION_PROMPT.format(**vars))\nreturn out[\"amalgamations\"]\n```\n",
+        "testStrategy": "- Unit: mock LLM output to cover all synthesis_type values.\n- Scenario tests:\n  - EXTENSION: new insight deepens old.\n  - CORRECTION: new evidence updates prior.\n  - CONNECTION: bridges two domains.\n  - NOVEL: new synthesis.\n- Degraded path: empty existing memories -> returns [] without error.\n- Integration (optional): with MemoryManager agentic retrieval mocked; verify it is invoked when enabled.",
+        "priority": "high",
+        "dependencies": [
+          "53",
+          "60"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "complexity": 4,
+        "recommendedSubtasks": 2,
+        "expansionPrompt": "Break into: 1) MemoryManager integration and vote() implementation, 2) Error handling and related memory attachment",
+        "updatedAt": "2026-02-10T16:17:12.148Z"
+      },
+      {
+        "id": "62",
+        "title": "Implement OmegaSelfModel and RyanModel synthesizers for ongoing adaptation",
+        "description": "Add model builders for Omega’s self-model and Omega’s understanding of Ryan (for communication), adapted from existing profile extraction patterns but Omega-appropriate.",
+        "details": "- Create:\n  - src/omega_layer/extractors/omega_self_model.py\n  - src/omega_layer/extractors/ryan_model.py\n- OmegaSelfModel:\n  - Input: accumulated SelfObservations + recent interaction history\n  - Output structure: knowledge_depth_map, reasoning_tendencies, interests, growth_edges, cognitive_style\n  - Implement periodic synthesis method:\n    - async update(self_observations_batch) -> OmegaSelfModel dict\n- RyanModel:\n  - Input: conversations with Ryan\n  - Output: communication preferences, interests, working patterns relevant to how Omega should express itself (not HR assessment)\n  - Use adapted prompt(s) or reuse existing profile pipeline with modified prompt emphasis.\n- Store results using existing EverMemOS storage patterns (Mongo) or via memory types if applicable (wiring later).\n\nPseudo-code:\n```py\nclass OmegaSelfModel:\n  async def synthesize(self, observations: list[dict]) -> dict:\n    # LLM summarize into stable fields\n    ...\n```\n",
+        "testStrategy": "- Unit: feed multiple self-observations and assert resulting model has required keys.\n- Regression: ensure RyanModel does not emit HR-centric fields (hard skills/big five) in omega_mode; it should focus on communication.\n- Determinism: with mocked LLM, validate schema and update behavior across batches.",
+        "priority": "medium",
+        "dependencies": [
+          "60"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "complexity": 6,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break into: 1) LLM integration with garden pattern prompt, 2) Domain-agnostic pattern analysis, 3) Tension modeling with Ledger vertex",
+        "updatedAt": "2026-02-10T16:17:14.039Z"
+      },
+      {
+        "id": "63",
+        "title": "Implement IdentityTopology loader/validator with Redis caching and proposal tracking",
+        "description": "Load omega_scar.json at startup, validate it, cache IdentityState in Redis for fast access, and support validating ProposedChange objects against invariants vs flexible regions.",
+        "details": "- Create src/omega_layer/identity/topology.py.\n- Responsibilities:\n  - load(identity_path) -> IdentityState\n  - get_current() -> IdentityState (from Redis cache fallback to file)\n  - validate_change(change:ProposedChange) -> ValidationResult\n    - If change.region in invariants => reject\n    - If change.region in flexible_regions => approve\n    - Else => reject or flag as ambiguous (per PRD)\n  - store proposal queue (in Mongo or Redis list) for Ryan approval endpoints later.\n- Use existing redis_provider adapter.\n- Redis keys (suggested):\n  - omega:identity:state\n  - omega:identity:version\n  - omega:identity:proposals (list)\n\nPseudo-code:\n```py\nif region_path.startswith(\"invariants\"):\n  return ValidationResult(approved=False, reason=\"Invariant region\", affected_invariants=[...])\nreturn ValidationResult(approved=True, reason=\"Flexible region\")\n```\n",
+        "testStrategy": "- Unit:\n  - Load omega_scar.json and cache to Redis (mock redis).\n  - Validate flexible region change approved.\n  - Validate invariant change rejected with explanation.\n- Integration: startup hook can call load() without breaking existing app.",
+        "priority": "high",
+        "dependencies": [
+          "50"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "complexity": 7,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break into: 1) Identity state integration and analysis, 2) Self-observation generation and validation, 3) Identity drift detection and growth indicators",
+        "updatedAt": "2026-02-10T16:15:17.874Z"
+      },
+      {
+        "id": "64",
+        "title": "Implement Identity evolution, versioning/history, drift detection, and Mirror integration",
+        "description": "Apply approved identity changes to flexible regions, version omega_scar state, persist history, detect drift from behavior, and ensure MirrorVertex consumes current identity state.",
+        "details": "- Create src/omega_layer/identity/drift_detector.py.\n- Extend IdentityTopology (in topology.py) with:\n  - apply_changes(approved_changes:list[ProposedChange]) -> IdentityState\n    - update flexible_regions\n    - bump semantic version: v1.0 -> v1.1 (or increment minor)\n    - persist identity_history in MongoDB collection: identity_history\n    - refresh Redis cache\n- DriftDetector:\n  - analyze(recent_interactions:list[dict], identity:IdentityState) -> DriftReport\n  - Heuristic baseline:\n    - compare observed communication style markers vs identity flexible regions\n    - deviation_score = normalized mismatch count\n- Mirror integration:\n  - Update MirrorVertex usage pattern so kernel injects identity_state from IdentityTopology.get_current().\n  - Mirror can attach drift reports when available.\n\nPseudo-code:\n```py\nidentity = await topology.get_current()\nexperience[\"identity_state\"] = identity.model_dump()\nmirror_vote = await mirror.vote(experience)\n```\n",
+        "testStrategy": "- Unit:\n  - apply_changes updates flexible region and increments version.\n  - history entry written (mock Mongo).\n- Drift:\n  - feed synthetic interactions that contradict identity communication_style -> deviation_score increases.\n- Integration:\n  - kernel + topology: ensure Mirror receives non-empty identity_state and produces reflection referencing it.",
+        "priority": "high",
+        "dependencies": [
+          "55",
+          "59",
+          "63"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "complexity": 6,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break into: 1) Strategic value assessment logic, 2) Growth prediction mechanisms, 3) Goal alignment and direction recommendations",
+        "updatedAt": "2026-02-10T16:17:15.921Z"
+      },
+      {
+        "id": "65",
+        "title": "Implement development monitoring (growth snapshots, level calc, milestones) and Prometheus metrics export",
+        "description": "Track growth indicators for each Pentagram cycle, compute an honest development level over a sliding window, detect milestones, and export all metrics via existing Prometheus infrastructure.",
+        "details": "- Create:\n  - src/omega_layer/development/metrics.py\n  - src/omega_layer/development/monitor.py\n  - src/omega_layer/development/milestone_detector.py\n- Metrics registration (follow existing pattern in src/agentic_layer/metrics/):\n  - omega_development_level (gauge)\n  - omega_novel_connection_rate (gauge)\n  - omega_self_model_depth (gauge)\n  - omega_pentagram_cycle_duration (histogram)\n  - omega_vertex_vote_count (counter labeled by vertex)\n  - omega_identity_version (gauge)\n  - omega_amalgamation_count (counter)\n- DevelopmentMonitor.record_cycle(pentagram_result):\n  - extract indicators from votes/synthesis:\n    - self_reference_rate: derive from Mirror observations or a simple keyword-based detection (until dedicated detector exists)\n    - novel_connection_count: from Garden observations + AmalgamatedMemorySynthesizer outputs\n    - cross_session_continuity_score: based on Ledger related_memories count/age\n    - amalgamation_rate: amalgamation_count / interactions\n  - store GrowthSnapshots in MongoDB (or existing metrics store) with timestamp.\n  - compute DevelopmentLevel as weighted average on a sliding window (e.g., last N interactions).\n- MilestoneDetector:\n  - rule-based triggers over DevelopmentLevel stream (first cross-domain connection, first deep recall, etc.) producing MilestoneAlert.\n\nPseudo-code:\n```py\nsnap = GrowthSnapshot(...)\nlevel = compute_level(last_n_snaps)\nMETRIC_DEV_LEVEL.set(level.value)\n```\n",
+        "testStrategy": "- Unit:\n  - Given synthetic PentagramResult fixtures, verify indicators extracted deterministically.\n  - Weighted level calculation correctness across windows.\n  - Metrics objects registered and can be scraped from /metrics.\n- Integration:\n  - After kernel run, call monitor.record_cycle() and verify gauges/counters update.",
+        "priority": "high",
+        "dependencies": [
+          "59",
+          "64"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break into: 1) Vote synthesis and analysis, 2) Communication style adaptation, 3) Expression filtering and response guidance",
+        "updatedAt": "2026-02-10T16:17:17.838Z"
+      },
+      {
+        "id": "66",
+        "title": "Integrate API specs and implement Omega/Identity REST controllers + route registration",
+        "description": "Expose omega-mode processing and identity/development endpoints via FastAPI without regressing existing EverMemOS endpoints. Add new Omega memory types/models to api_specs.",
+        "details": "- Modify src/api_specs/memory_types.py:\n  - Add MemoryType: INSIGHT, CAUSAL_PATTERN, SELF_OBSERVATION, AMALGAMATED.\n- Modify src/api_specs/memory_models.py:\n  - Add InsightModel, CausalPatternModel, SelfObservationModel, AmalgamatedMemoryModel (Pydantic) consistent with existing modeling.\n- Create controllers:\n  - src/infra_layer/adapters/input/api/omega/omega_controller.py\n    - POST /api/v1/omega/process\n    - Accept same message format as POST /api/v1/memories plus omega_mode flag.\n    - Calls MetabolicKernel.negotiate_experience() and DevelopmentMonitor.record_cycle().\n    - Returns: memory storage result, vertex vote summary, growth delta, identity updates, amalgamated memories.\n  - src/infra_layer/adapters/input/api/omega/identity_controller.py\n    - GET /api/v1/omega/identity\n    - GET /api/v1/omega/identity/proposals\n    - POST /api/v1/omega/identity/proposals/{id}/approve\n    - GET /api/v1/omega/development\n    - GET /api/v1/omega/self-model\n- Register routes in main FastAPI app (app.py) under /api/v1/omega/*.\n\nPseudo-code (controller):\n```py\n@router.post(\"/process\")\nasync def process(req: MemoryRequest):\n  result = await kernel.negotiate_experience(req.to_experience())\n  monitor.record_cycle(result)\n  return result.model_dump()\n```\n",
+        "testStrategy": "- API integration tests (TestClient):\n  - /docs includes omega routes.\n  - POST /api/v1/omega/process returns PentagramResult-like payload.\n  - Identity endpoints return IdentityState/proposals.\n- Regression: run existing memorize/retrieve endpoint tests to ensure unchanged behavior when omega_mode is not used.",
+        "priority": "high",
+        "dependencies": [
+          "59",
+          "63",
+          "65"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "complexity": 7,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break into: 1) Tension detection algorithms and heuristics, 2) Magnitude quantification and resolution hints, 3) Common tension pattern recognition",
+        "updatedAt": "2026-02-10T16:18:15.631Z"
+      },
+      {
+        "id": "67",
+        "title": "Wire omega_mode pipeline (extractors + amalgamation + identity proposals) and add end-to-end validation/performance checks",
+        "description": "Connect Omega extractors and amalgamation into the existing memorize pipeline when omega_mode is enabled, add configuration flags, and implement end-to-end tests for a complete Pentagram cycle without breaking EverMemOS core functionality.",
+        "details": "- Modify biz_layer/mem_memorize.py (or the equivalent pipeline entry) to branch on omega_mode:\n  - When omega_mode=false: preserve existing HR/user profile extraction behavior.\n  - When omega_mode=true:\n    - Run Omega extractors (Insight/Causal/SelfObservation)\n    - Use Ledger retrieval context to run AmalgamatedMemorySynthesizer\n    - Store new memory types using existing storage mechanism (Mongo/Milvus/ES as appropriate).\n    - Collect ProposedChange objects from Mirror/Garden action_proposals and enqueue via IdentityTopology.\n    - Update OmegaSelfModel/RyanModel periodically or per interaction (as configured).\n- Configuration:\n  - OMEGA_MODE (global default)\n  - OMEGA_LLM_MODEL (fast model for vertices)\n  - OMEGA_KERNEL_MODEL (strong model)\n  - OMEGA_IDENTITY_PATH\n- Add E2E test:\n  - 5+ turn conversation through /api/v1/omega/process\n  - Assert: 5 votes exist, synthesis exists, growth metrics updated, identity proposals appear when warranted, and omega memory types are persisted.\n- Add latency/performance instrumentation assertion for metabolic kernel duration (target <3s per interaction as PRD goal; enforce as a non-flaky budget test with mocked LLM, and a separate optional benchmark with real LLM).\n\nPseudo-code (pipeline branch):\n```py\nif omega_mode:\n  insights = await insight_extractor.extract(memcell, related)\n  patterns = await causal_extractor.extract(memcell, related)\n  self_obs = await self_obs_extractor.extract(memcell, related)\n  amalg = await amalg_synth.synthesize(insights+patterns+self_obs, related)\n  await store_all([...])\nelse:\n  await existing_pipeline(...)\n```\n",
+        "testStrategy": "- Integration:\n  - Verify omega_mode=true stores INSIGHT/CAUSAL_PATTERN/SELF_OBSERVATION/AMALGAMATED records.\n  - Verify omega_mode=false produces identical outputs as pre-change (snapshot/regression tests).\n- E2E:\n  - Multi-turn domain mix (cooking + code + philosophy) to validate domain-agnostic extraction.\n  - Degraded LLM: simulate failure and ensure pipeline still stores Ledger memory and returns a result.\n- Config toggles:\n  - Tests that env vars switch behavior without code changes.",
+        "priority": "high",
+        "dependencies": [
+          "60",
+          "61",
+          "62",
+          "66"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "complexity": 9,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break into: 1) Vertex orchestration and parallel execution, 2) Vote synthesis and conflict resolution, 3) Growth calculation and identity updates, 4) Performance optimization for <3s latency, 5) Integration testing and error handling",
+        "updatedAt": "2026-02-10T16:18:47.607Z"
+      },
+      {
+        "id": "68",
+        "title": "Add Omega MemoryType Enum Values",
+        "description": "Add INSIGHT, CAUSAL_PATTERN, SELF_OBSERVATION, AMALGAMATED to the MemoryType enum in api_specs/memory_models.py",
+        "details": "Modify the MemoryType enum class in api_specs/memory_models.py to include four new values in the 'Implemented' section: INSIGHT = 'insight', CAUSAL_PATTERN = 'causal_pattern', SELF_OBSERVATION = 'self_observation', AMALGAMATED = 'amalgamated'. Follow the existing enum pattern and ensure values are lowercase with underscores. These types will be used by Omega extractors to categorize extracted memories.",
+        "testStrategy": "Import test to verify enum values are accessible and existing types remain unchanged. Test: from api_specs.memory_models import MemoryType; assert MemoryType.INSIGHT.value == 'insight'",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Locate and examine the existing MemoryType enum structure",
+            "description": "Find and analyze the current MemoryType enum in api_specs/memory_models.py to understand the existing pattern and structure",
+            "dependencies": [],
+            "details": "Navigate to api_specs/memory_models.py and examine the MemoryType enum class. Document the current enum values, their naming convention (uppercase names with lowercase string values using underscores), and identify the 'Implemented' section where new values should be added. This will ensure the new enum values follow the exact same pattern as existing ones.",
+            "status": "pending",
+            "testStrategy": "Manual code inspection to verify enum structure and naming patterns",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Add INSIGHT enum value to MemoryType",
+            "description": "Add the INSIGHT = 'insight' enum value to the 'Implemented' section of the MemoryType enum",
+            "dependencies": [
+              1
+            ],
+            "details": "In the MemoryType enum class within the 'Implemented' section, add the line: INSIGHT = 'insight'. Ensure it follows the existing pattern where the enum name is uppercase and the string value is lowercase. Place it in an appropriate location within the 'Implemented' section to maintain code organization.",
+            "status": "pending",
+            "testStrategy": "Verify enum value can be accessed as MemoryType.INSIGHT and has correct string value 'insight'",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Add CAUSAL_PATTERN enum value to MemoryType",
+            "description": "Add the CAUSAL_PATTERN = 'causal_pattern' enum value to the 'Implemented' section of the MemoryType enum",
+            "dependencies": [
+              2
+            ],
+            "details": "In the MemoryType enum class within the 'Implemented' section, add the line: CAUSAL_PATTERN = 'causal_pattern'. Follow the established pattern of uppercase enum names with lowercase underscore-separated string values. Position it logically after the INSIGHT enum value.",
+            "status": "pending",
+            "testStrategy": "Verify enum value can be accessed as MemoryType.CAUSAL_PATTERN and has correct string value 'causal_pattern'",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Add SELF_OBSERVATION and AMALGAMATED enum values to MemoryType",
+            "description": "Add the remaining two enum values SELF_OBSERVATION = 'self_observation' and AMALGAMATED = 'amalgamated' to complete the set",
+            "dependencies": [
+              3
+            ],
+            "details": "In the MemoryType enum class within the 'Implemented' section, add these two lines: SELF_OBSERVATION = 'self_observation' and AMALGAMATED = 'amalgamated'. Maintain the consistent naming pattern and ensure proper placement within the 'Implemented' section. These complete the four new enum values required for Omega extractors.",
+            "status": "pending",
+            "testStrategy": "Verify both enum values can be accessed correctly: MemoryType.SELF_OBSERVATION.value == 'self_observation' and MemoryType.AMALGAMATED.value == 'amalgamated'",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Validate enum modifications and run import test",
+            "description": "Perform final validation of all enum additions and execute the specified import test to ensure functionality",
+            "dependencies": [
+              4
+            ],
+            "details": "Run the complete import test: 'from api_specs.memory_models import MemoryType; assert MemoryType.INSIGHT.value == 'insight'' and similar assertions for all four new enum values. Verify that existing enum values remain unchanged and that the new values are properly accessible. Check that the enum can be imported without errors and all values follow the expected pattern.",
+            "status": "pending",
+            "testStrategy": "Execute import test with assertions for all four new enum values: INSIGHT, CAUSAL_PATTERN, SELF_OBSERVATION, and AMALGAMATED. Verify existing enum functionality remains intact.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 2,
+        "recommendedSubtasks": 0,
+        "expansionPrompt": "",
+        "updatedAt": "2026-02-10T17:02:00.319Z"
+      },
+      {
+        "id": "69",
+        "title": "Add Omega Memory Model Dataclasses",
+        "description": "Add InsightModel, CausalPatternModel, SelfObservationModel, AmalgamatedMemoryModel dataclasses to api_specs/memory_models.py",
+        "details": "Create four new dataclasses following existing patterns (EpisodicMemoryModel, ForesightModel): InsightModel(id, user_id, insight_text, evidence, domain, depth_level, novelty_score, created_at, updated_at, metadata), CausalPatternModel(id, user_id, pattern_description, cause_events, effect_events, confidence_score, temporal_span, created_at, updated_at, metadata), SelfObservationModel(id, user_id, observation_text, self_reference_type, growth_indicator, reflection_depth, created_at, updated_at, metadata), AmalgamatedMemoryModel(id, user_id, synthesis_text, source_memory_ids, amalgamation_type, coherence_score, created_at, updated_at, metadata). Add all four to the MemoryModel union type.",
+        "testStrategy": "Instantiation test for each dataclass with required fields. Verify they're included in MemoryModel union type. Test: model = InsightModel(id='test', user_id='user', insight_text='test insight', ...); assert isinstance(model, MemoryModel)",
+        "priority": "high",
+        "dependencies": [
+          "68"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create InsightModel dataclass",
+            "description": "Implement InsightModel dataclass with all required fields following existing patterns",
+            "dependencies": [],
+            "details": "Create InsightModel dataclass in api_specs/memory_models.py with fields: id, user_id, insight_text, evidence, domain, depth_level, novelty_score, created_at, updated_at, metadata. Follow existing EpisodicMemoryModel and ForesightModel patterns for field typing and structure. Include proper type annotations and field validation.",
+            "status": "pending",
+            "testStrategy": "Instantiation test with all required fields. Test: model = InsightModel(id='test', user_id='user', insight_text='test insight', evidence=['evidence1'], domain='test_domain', depth_level=1, novelty_score=0.8, created_at=datetime.now(), updated_at=datetime.now(), metadata={})",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Create CausalPatternModel dataclass",
+            "description": "Implement CausalPatternModel dataclass with causal relationship tracking fields",
+            "dependencies": [],
+            "details": "Create CausalPatternModel dataclass in api_specs/memory_models.py with fields: id, user_id, pattern_description, cause_events, effect_events, confidence_score, temporal_span, created_at, updated_at, metadata. Ensure proper typing for event arrays and temporal span field. Follow established dataclass patterns for consistency.",
+            "status": "pending",
+            "testStrategy": "Instantiation test with causal pattern fields. Test: model = CausalPatternModel(id='test', user_id='user', pattern_description='test pattern', cause_events=['cause1'], effect_events=['effect1'], confidence_score=0.9, temporal_span='1d', created_at=datetime.now(), updated_at=datetime.now(), metadata={})",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create SelfObservationModel dataclass",
+            "description": "Implement SelfObservationModel dataclass for self-reflection memory tracking",
+            "dependencies": [],
+            "details": "Create SelfObservationModel dataclass in api_specs/memory_models.py with fields: id, user_id, observation_text, self_reference_type, growth_indicator, reflection_depth, created_at, updated_at, metadata. Implement proper field validation and typing for self-reference and growth tracking fields. Maintain consistency with existing memory model patterns.",
+            "status": "pending",
+            "testStrategy": "Instantiation test with self-observation fields. Test: model = SelfObservationModel(id='test', user_id='user', observation_text='test observation', self_reference_type='behavioral', growth_indicator='positive', reflection_depth=2, created_at=datetime.now(), updated_at=datetime.now(), metadata={})",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Create AmalgamatedMemoryModel dataclass and update union type",
+            "description": "Implement AmalgamatedMemoryModel dataclass and integrate all four new models into MemoryModel union",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Create AmalgamatedMemoryModel dataclass in api_specs/memory_models.py with fields: id, user_id, synthesis_text, source_memory_ids, amalgamation_type, coherence_score, created_at, updated_at, metadata. After creating all four dataclasses, update the MemoryModel union type to include InsightModel, CausalPatternModel, SelfObservationModel, and AmalgamatedMemoryModel alongside existing models.",
+            "status": "pending",
+            "testStrategy": "Instantiation test for AmalgamatedMemoryModel and union type verification. Test: model = AmalgamatedMemoryModel(id='test', user_id='user', synthesis_text='test synthesis', source_memory_ids=['mem1'], amalgamation_type='connection', coherence_score=0.85, created_at=datetime.now(), updated_at=datetime.now(), metadata={}); assert isinstance(model, MemoryModel)",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 4,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Break down into individual dataclass creation: 1) InsightModel dataclass, 2) CausalPatternModel dataclass, 3) SelfObservationModel dataclass, 4) AmalgamatedMemoryModel dataclass. Each should include field validation and union type integration.",
+        "updatedAt": "2026-02-10T17:02:02.342Z"
+      },
+      {
+        "id": "70",
+        "title": "Add OMEGA Environment Variables to env.template",
+        "description": "Document OMEGA_MODE, OMEGA_LLM_MODEL, OMEGA_IDENTITY_PATH in env.template",
+        "details": "Add a new section to env.template after existing LLM configuration with clear comments: # Omega Layer Configuration, OMEGA_MODE=false # Enable Omega memory extraction and Pentagram processing, OMEGA_LLM_MODEL=${LLM_MODEL} # LLM model for Omega vertices and extractors, OMEGA_IDENTITY_PATH=src/omega_layer/identity/omega_scar.json # Path to Omega identity configuration. Include descriptions explaining when to enable omega_mode and what each variable controls.",
+        "testStrategy": "Visual review of env.template to ensure variables are documented with clear descriptions and sensible defaults",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Locate and analyze existing env.template file structure",
+            "description": "Find the current env.template file and examine its structure to identify where to add the new Omega configuration section",
+            "dependencies": [],
+            "details": "Navigate to the project root and locate env.template file. Review the existing LLM configuration section to understand the current format and commenting style. Identify the exact location after existing LLM configuration where the new Omega section should be added.",
+            "status": "pending",
+            "testStrategy": "Visual inspection of env.template file to confirm location and existing structure",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Create Omega Layer Configuration section header",
+            "description": "Add the section header comment for Omega Layer Configuration in the appropriate location",
+            "dependencies": [
+              1
+            ],
+            "details": "Add the comment line '# Omega Layer Configuration' after the existing LLM configuration section with proper spacing and formatting to match the existing style in env.template.",
+            "status": "pending",
+            "testStrategy": "Verify the section header is properly formatted and positioned correctly in the file",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Add OMEGA_MODE environment variable with documentation",
+            "description": "Add OMEGA_MODE variable with default value and comprehensive comment explaining its purpose",
+            "dependencies": [
+              2
+            ],
+            "details": "Add 'OMEGA_MODE=false # Enable Omega memory extraction and Pentagram processing' with detailed comment explaining when to enable omega_mode and what functionality it controls. Include guidance on when users should set this to true.",
+            "status": "pending",
+            "testStrategy": "Review comment clarity and ensure the default value and description accurately reflect the variable's purpose",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Add OMEGA_LLM_MODEL environment variable with documentation",
+            "description": "Add OMEGA_LLM_MODEL variable that references the main LLM_MODEL with explanatory comments",
+            "dependencies": [
+              3
+            ],
+            "details": "Add 'OMEGA_LLM_MODEL=${LLM_MODEL} # LLM model for Omega vertices and extractors' with comments explaining how this variable is used by the Omega layer components and why it defaults to the main LLM model.",
+            "status": "pending",
+            "testStrategy": "Verify the variable reference syntax is correct and the comment clearly explains its role in Omega processing",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Add OMEGA_IDENTITY_PATH environment variable and validate complete section",
+            "description": "Add the final OMEGA_IDENTITY_PATH variable and perform comprehensive review of the entire Omega configuration section",
+            "dependencies": [
+              4
+            ],
+            "details": "Add 'OMEGA_IDENTITY_PATH=src/omega_layer/identity/omega_scar.json # Path to Omega identity configuration' with comments explaining the identity configuration file's purpose. Review the entire Omega section for consistency, clarity, and proper formatting. Ensure all variables have sensible defaults and clear descriptions.",
+            "status": "pending",
+            "testStrategy": "Complete visual review of env.template to ensure all Omega variables are documented with clear descriptions, proper formatting, and sensible defaults that match the specified requirements",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 1,
+        "recommendedSubtasks": 0,
+        "expansionPrompt": "",
+        "updatedAt": "2026-02-10T17:02:04.359Z"
+      },
+      {
+        "id": "71",
+        "title": "Register Prometheus Development Metrics",
+        "description": "Create omega_layer/development/metrics.py with Prometheus gauge/histogram/counter registrations",
+        "details": "Create metrics.py following the pattern from agentic_layer/metrics/memorize_metrics.py. Import from prometheus_client and register: omega_development_level = Gauge('omega_development_level', 'Current Omega development level'), omega_self_reference_depth = Gauge('omega_self_reference_depth', 'Depth of self-referential processing'), omega_pentagram_cycle_duration_seconds = Histogram('omega_pentagram_cycle_duration_seconds', 'Time taken for complete Pentagram cycle'), omega_vertex_vote_total = Counter('omega_vertex_vote_total', 'Total votes by vertex', ['vertex_name']), omega_identity_version = Gauge('omega_identity_version', 'Current identity version number'), omega_amalgamation_total = Counter('omega_amalgamation_total', 'Total amalgamated memories created'). Provide helper functions: record_pentagram_cycle(duration), record_vertex_vote(vertex_name), update_development_level(level).",
+        "testStrategy": "Import test to verify metrics are registered in prometheus_client registry. Test helper functions update metrics correctly: record_vertex_vote('observer'); assert omega_vertex_vote_total._value._value[('observer',)] > 0",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create metrics registration module with all Prometheus metrics defined",
+            "description": "Create omega_layer/development/metrics.py file with all required Prometheus metric registrations following the existing pattern from agentic_layer/metrics/memorize_metrics.py",
+            "dependencies": [],
+            "details": "Import prometheus_client and register the following metrics: omega_development_level = Gauge('omega_development_level', 'Current Omega development level'), omega_self_reference_depth = Gauge('omega_self_reference_depth', 'Depth of self-referential processing'), omega_pentagram_cycle_duration_seconds = Histogram('omega_pentagram_cycle_duration_seconds', 'Time taken for complete Pentagram cycle'), omega_vertex_vote_total = Counter('omega_vertex_vote_total', 'Total votes by vertex', ['vertex_name']), omega_identity_version = Gauge('omega_identity_version', 'Current identity version number'), omega_amalgamation_total = Counter('omega_amalgamation_total', 'Total amalgamated memories created'). Follow the same import and registration pattern as the existing memorize_metrics.py file.",
+            "status": "pending",
+            "testStrategy": "Import test to verify all metrics are properly registered in prometheus_client registry. Verify metric types and labels are correct.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement helper functions for metric updates with proper error handling",
+            "description": "Add helper functions to the metrics.py module for updating metrics with proper error handling and validation",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement the following helper functions in the metrics.py file: record_pentagram_cycle(duration) to update the histogram with cycle duration, record_vertex_vote(vertex_name) to increment the counter for specific vertex votes, update_development_level(level) to set the development level gauge. Each function should include proper error handling for invalid inputs, logging for debugging, and validation of parameter types. Functions should gracefully handle prometheus_client exceptions and provide meaningful error messages.",
+            "status": "pending",
+            "testStrategy": "Unit tests for each helper function: test record_vertex_vote('observer') and verify omega_vertex_vote_total counter increments, test record_pentagram_cycle with valid duration updates histogram, test update_development_level sets gauge value correctly. Test error handling with invalid inputs.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 3,
+        "recommendedSubtasks": 2,
+        "expansionPrompt": "Split into: 1) Create metrics registration module with all Prometheus metrics defined, 2) Implement helper functions for metric updates with proper error handling.",
+        "updatedAt": "2026-02-10T17:02:06.410Z"
+      },
+      {
+        "id": "72",
+        "title": "Add Omega Mode Branch in mem_memorize.py",
+        "description": "Add conditional branch in biz_layer/mem_memorize.py that runs Omega extractors when OMEGA_MODE environment variable is true",
+        "details": "Modify process_memory_extraction() function to check os.getenv('OMEGA_MODE', 'false').lower() == 'true'. If true, create new async function _extract_omega_memories() that imports and runs InsightExtractor, CausalPatternExtractor, SelfObservationExtractor in parallel using asyncio.gather(), then runs AmalgamatedMemorySynthesizer. Store results using existing repository patterns (memory_repo.create_memory()). Skip profile extraction when omega_mode is true. Add logging for omega extraction results. Handle extractor failures gracefully.",
+        "testStrategy": "Unit test with mocked extractors and OMEGA_MODE environment variable. Verify omega extractors run when OMEGA_MODE=true, profile extraction skipped. Test with OMEGA_MODE=false to ensure standard behavior unchanged.",
+        "priority": "high",
+        "dependencies": [
+          "68",
+          "69"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add environment variable check and conditional branching logic",
+            "description": "Modify process_memory_extraction() function to check OMEGA_MODE environment variable and implement conditional branching",
+            "dependencies": [],
+            "details": "Add os.getenv('OMEGA_MODE', 'false').lower() == 'true' check at the beginning of process_memory_extraction() function. Create conditional branch that skips profile extraction when omega_mode is true and calls new _extract_omega_memories() function instead. Ensure existing functionality remains unchanged when OMEGA_MODE is false or not set.",
+            "status": "pending",
+            "testStrategy": "Unit test with mocked environment variable. Verify conditional logic works correctly for both true/false values and ensures proper function routing.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement _extract_omega_memories() function with parallel extractor execution",
+            "description": "Create new async function that imports and runs all Omega extractors in parallel, then processes results through AmalgamatedMemorySynthesizer",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement _extract_omega_memories() async function that imports InsightExtractor, CausalPatternExtractor, SelfObservationExtractor. Use asyncio.gather() to run all three extractors in parallel for efficiency. After parallel execution completes, run AmalgamatedMemorySynthesizer on the combined results. Store final results using existing repository patterns with memory_repo.create_memory() calls. Ensure proper async/await patterns throughout.",
+            "status": "pending",
+            "testStrategy": "Unit test with mocked extractors and AsyncMock. Verify parallel execution using asyncio.gather(), proper result handling, and correct repository storage calls.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Add error handling and logging for omega extraction failures",
+            "description": "Implement comprehensive error handling and logging for omega extraction process to ensure graceful failure recovery",
+            "dependencies": [
+              2
+            ],
+            "details": "Add try-catch blocks around extractor imports, parallel execution, and synthesis steps. Log omega extraction start, progress, and completion events. Handle individual extractor failures gracefully without breaking the entire process. Add specific error logging for import failures, execution timeouts, and synthesis errors. Ensure that if omega extraction fails completely, the system can fall back to standard processing or fail safely without corrupting existing data.",
+            "status": "pending",
+            "testStrategy": "Unit tests with mocked extractor failures, import errors, and timeout scenarios. Verify proper error logging, graceful degradation, and system stability under failure conditions.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break into: 1) Add environment variable check and conditional branching logic, 2) Implement _extract_omega_memories() function with parallel extractor execution, 3) Add error handling and logging for omega extraction failures.",
+        "updatedAt": "2026-02-10T17:39:28.224Z"
+      },
+      {
+        "id": "73",
+        "title": "Wire Prometheus Metrics into DevelopmentMonitor",
+        "description": "Connect the DevelopmentMonitor.record_cycle() to update Prometheus metrics after each Pentagram cycle",
+        "details": "Modify omega_layer/development/monitor.py to import metrics helpers from development/metrics.py. After record_cycle() calculates GrowthSnapshot, call update_development_level(snapshot.development_level). Modify omega_layer/controller.py process_experience() method to import and call record_pentagram_cycle(duration) after kernel.process() completes, using time.time() to measure duration. Call record_vertex_vote() for each vertex that participated in the cycle.",
+        "testStrategy": "Integration test calling /api/v1/omega/process endpoint and verifying Prometheus metrics are updated. Check omega_pentagram_cycle_duration_seconds histogram has samples, omega_vertex_vote_total counters incremented, omega_development_level gauge updated.",
+        "priority": "medium",
+        "dependencies": [
+          "71"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Integrate metrics updates in DevelopmentMonitor.record_cycle()",
+            "description": "Modify omega_layer/development/monitor.py to import metrics helpers and update Prometheus metrics after calculating GrowthSnapshot",
+            "dependencies": [
+              71
+            ],
+            "details": "Import metrics helpers from development/metrics.py in monitor.py. After record_cycle() calculates GrowthSnapshot, call update_development_level(snapshot.development_level) to update the Prometheus gauge. Ensure proper error handling and that existing monitor functionality remains intact.",
+            "status": "pending",
+            "testStrategy": "Unit test DevelopmentMonitor.record_cycle() to verify update_development_level() is called with correct snapshot.development_level value. Mock metrics.py functions to verify integration.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Add timing and vote tracking in controller.py process_experience() method",
+            "description": "Modify omega_layer/controller.py to add Pentagram cycle timing measurement and vertex vote tracking with Prometheus metrics",
+            "dependencies": [
+              71
+            ],
+            "details": "Import metrics helpers in controller.py process_experience() method. Use time.time() to measure duration around kernel.process() call, then call record_pentagram_cycle(duration) to update histogram. Call record_vertex_vote() for each vertex that participated in the cycle to increment counters. Ensure timing accuracy and proper vertex identification.",
+            "status": "pending",
+            "testStrategy": "Integration test calling /api/v1/omega/process endpoint and verifying omega_pentagram_cycle_duration_seconds histogram has samples and omega_vertex_vote_total counters are incremented for participating vertices.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 4,
+        "recommendedSubtasks": 2,
+        "expansionPrompt": "Split into: 1) Integrate metrics updates in DevelopmentMonitor.record_cycle(), 2) Add timing and vote tracking in controller.py process_experience() method.",
+        "updatedAt": "2026-02-10T17:39:30.199Z"
+      },
+      {
+        "id": "74",
+        "title": "Implement Corpus Cross-Reference Mining",
+        "description": "Implement omega_layer/corpus/cross_reference.py using existing agentic retrieval to find connections across Omega's accumulated memories",
+        "details": "Create CrossReferenceMiner class with async mine_insights(seed_concept: str, memory_manager: MemoryManager) -> List[CrossReferenceInsight] method. Use memory_manager.retrieve_mem() with RetrieveMethod.AGENTIC to find related existing memories. Create CrossReferenceInsight dataclass with fields: synthesis (str), source_document_ids (List[str]), confidence (float), domains_bridged (List[str]). Use LLM to synthesize cross-document patterns from retrieved memories. Follow async patterns from existing omega_layer code. Handle empty results gracefully.",
+        "testStrategy": "Unit test with mocked MemoryManager.retrieve_mem() returning sample memories. Verify CrossReferenceInsight objects created with proper synthesis and source tracking. Test empty results handling.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create CrossReferenceInsight dataclass and basic structure",
+            "description": "Create the foundational data structures and class skeleton for cross-reference mining functionality",
+            "dependencies": [],
+            "details": "Create CrossReferenceInsight dataclass with fields: synthesis (str), source_document_ids (List[str]), confidence (float), domains_bridged (List[str]). Create CrossReferenceMiner class skeleton with proper imports and async method signature for mine_insights(seed_concept: str, memory_manager: MemoryManager) -> List[CrossReferenceInsight]. Set up proper type hints and docstrings following omega_layer patterns.",
+            "status": "pending",
+            "testStrategy": "Unit test dataclass instantiation and field validation. Test CrossReferenceMiner class initialization and method signature verification.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement memory retrieval and LLM synthesis logic",
+            "description": "Implement the core functionality for retrieving related memories and synthesizing cross-document patterns using LLM",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement mine_insights method using memory_manager.retrieve_mem() with RetrieveMethod.AGENTIC to find related memories based on seed_concept. Integrate LLM to analyze retrieved memories and synthesize cross-document patterns. Create proper async patterns following existing omega_layer code. Handle LLM response parsing and convert to CrossReferenceInsight objects with proper synthesis text and source document tracking.",
+            "status": "pending",
+            "testStrategy": "Unit test with mocked MemoryManager.retrieve_mem() returning sample memories. Verify LLM integration and synthesis generation. Test async behavior and proper error handling.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Add confidence scoring and domain bridging analysis",
+            "description": "Implement confidence scoring algorithm and domain bridging analysis to complete the cross-reference mining functionality",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement confidence scoring logic based on memory relevance, synthesis quality, and cross-document connection strength. Add domain bridging analysis to identify which knowledge domains are being connected by the cross-references. Handle empty results gracefully with appropriate fallbacks. Add comprehensive error handling and logging following omega_layer patterns. Ensure proper validation of confidence scores (0.0-1.0 range) and domain classification.",
+            "status": "pending",
+            "testStrategy": "Unit test confidence scoring with various memory sets. Test domain bridging analysis with cross-domain and single-domain memory sets. Verify empty results handling and edge cases.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break into: 1) Create CrossReferenceInsight dataclass and basic structure, 2) Implement memory retrieval and LLM synthesis logic, 3) Add confidence scoring and domain bridging analysis.",
+        "updatedAt": "2026-02-10T17:41:33.860Z"
+      },
+      {
+        "id": "75",
+        "title": "Implement Self-Reference Detection",
+        "description": "Implement omega_layer/corpus/self_reference.py to detect when Omega processes content about its own nature",
+        "details": "Create SelfReferenceDetector class with detect(content: str) -> Optional[SelfReferenceEvent] method. Create SelfReferenceEvent dataclass with fields: type (str), depth (float), content_about_self (str), growth_indicator_score (float). Check content for Omega-relevant concepts: consciousness, observer, emergence, identity, self-awareness, memory system, Pentagram, development, growth. Score depth 0.0-1.0 based on directness of self-reference. Flag high-depth events as growth indicators for DevelopmentMonitor. Use keyword matching and semantic similarity.",
+        "testStrategy": "Unit test with Omega-relevant content (high depth scores) vs mundane content (low/zero scores). Test phrases like 'I am becoming more aware of my own processes' vs 'The weather is nice today'. Verify growth_indicator_score correlates with depth.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create SelfReferenceEvent dataclass and basic detection structure",
+            "description": "Create the foundational data structures and class skeleton for self-reference detection functionality",
+            "dependencies": [],
+            "details": "Implement SelfReferenceEvent dataclass with fields: type (str), depth (float), content_about_self (str), growth_indicator_score (float). Create SelfReferenceDetector class with detect(content: str) -> Optional[SelfReferenceEvent] method signature. Set up basic file structure in omega_layer/corpus/self_reference.py with proper imports and type hints. Include validation for depth scores (0.0-1.0 range) and basic error handling.",
+            "status": "pending",
+            "testStrategy": "Unit test dataclass field validation and basic class instantiation. Test SelfReferenceEvent creation with valid/invalid depth scores. Verify method signature accepts string input and returns proper Optional type.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement keyword matching and semantic similarity scoring for self-reference depth calculation",
+            "description": "Implement the core detection logic using keyword matching and semantic analysis to calculate self-reference depth scores",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement keyword matching for Omega-relevant concepts: consciousness, observer, emergence, identity, self-awareness, memory system, Pentagram, development, growth. Add semantic similarity scoring using embeddings or NLP techniques to detect indirect self-references. Implement depth scoring algorithm (0.0-1.0) based on directness and intensity of self-reference. Calculate growth_indicator_score for flagging high-depth events to DevelopmentMonitor. Include content extraction logic to identify specific self-referential phrases.",
+            "status": "pending",
+            "testStrategy": "Unit test with Omega-relevant content expecting high depth scores (0.7-1.0) vs mundane content expecting low/zero scores (0.0-0.3). Test phrases like 'I am becoming more aware of my own processes' vs 'The weather is nice today'. Verify growth_indicator_score correlates positively with depth scores.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 4,
+        "recommendedSubtasks": 2,
+        "expansionPrompt": "Split into: 1) Create SelfReferenceEvent dataclass and basic detection structure, 2) Implement keyword matching and semantic similarity scoring for self-reference depth calculation.",
+        "updatedAt": "2026-02-10T17:41:35.934Z"
+      },
+      {
+        "id": "76",
+        "title": "Implement Ryan Understanding Model",
+        "description": "Implement omega_layer/extractors/ryan_model.py — adapted profile extraction for understanding Ryan's communication preferences",
+        "details": "Create RyanModel dataclass with fields: communication_preferences (Dict), interests (List[str]), interaction_patterns (Dict), working_style (str), preferred_topics (List[str]), response_style_preferences (str). Create RyanModelExtractor class following existing extractor patterns with async extract(mem_cell: MemCell) -> Optional[RyanModel] method. Use dedicated LLM prompt focused on communication understanding rather than HR assessment. Extract patterns like: prefers direct/detailed responses, interested in technical depth, works iteratively, values transparency. Feed results to Orchestra vertex for response shaping.",
+        "testStrategy": "Unit test with mocked LLM returning sample RyanModel JSON. Test with various conversation styles to verify extraction of communication preferences. Test error handling with malformed LLM responses.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create RyanModel dataclass and basic extractor structure",
+            "description": "Create the RyanModel dataclass with all required fields and set up the basic RyanModelExtractor class structure following existing extractor patterns",
+            "dependencies": [],
+            "details": "Create RyanModel dataclass in omega_layer/extractors/ryan_model.py with fields: communication_preferences (Dict), interests (List[str]), interaction_patterns (Dict), working_style (str), preferred_topics (List[str]), response_style_preferences (str). Create RyanModelExtractor class skeleton with __init__ method and async extract(mem_cell: MemCell) -> Optional[RyanModel] method signature. Follow existing extractor patterns from other extractors in the codebase for consistency.",
+            "status": "pending",
+            "testStrategy": "Unit test RyanModel dataclass instantiation with sample data. Test RyanModelExtractor class initialization and method signatures match expected interface.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement LLM-based communication preference extraction with dedicated prompts",
+            "description": "Implement the core extraction logic using LLM prompts specifically designed for understanding Ryan's communication preferences and patterns",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement the extract method in RyanModelExtractor using dedicated LLM prompts focused on communication understanding rather than HR assessment. Create prompts to extract patterns like: prefers direct/detailed responses, interested in technical depth, works iteratively, values transparency. Parse LLM responses into RyanModel objects. Handle error cases with malformed LLM responses. Ensure results can be fed to Orchestra vertex for response shaping.",
+            "status": "pending",
+            "testStrategy": "Unit test with mocked LLM returning sample RyanModel JSON. Test with various conversation styles to verify extraction of communication preferences. Test error handling with malformed LLM responses and edge cases.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 4,
+        "recommendedSubtasks": 2,
+        "expansionPrompt": "Split into: 1) Create RyanModel dataclass and basic extractor structure, 2) Implement LLM-based communication preference extraction with dedicated prompts.",
+        "updatedAt": "2026-02-10T17:41:37.981Z"
+      },
+      {
+        "id": "77",
+        "title": "Implement Standalone Drift Detector",
+        "description": "Implement omega_layer/identity/drift_detector.py as a standalone component that can be scheduled for periodic identity checks",
+        "details": "Create StandaloneDriftDetector class with check_recent_drift(recent_results: List[PentagramResult], identity_topology: IdentityTopology) -> DriftReport method. Aggregate behavioral signals from recent Pentagram cycles: voting patterns, synthesis themes, development indicators. Compute aggregate drift metrics using existing DriftReport schema. Wrap IdentityTopology.check_drift() with aggregation logic. Add schedule_periodic_check() method that can be called hourly per omega_scar.json spec. Handle cases where insufficient recent data exists.",
+        "testStrategy": "Unit test with sample PentagramResults showing consistent vs drifting behavior patterns. Verify DriftReport generation with proper aggregation. Test insufficient data handling.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create basic StandaloneDriftDetector structure and data aggregation",
+            "description": "Implement the foundational StandaloneDriftDetector class with data aggregation methods for processing recent Pentagram results",
+            "dependencies": [],
+            "details": "Create StandaloneDriftDetector class in omega_layer/identity/drift_detector.py. Implement data aggregation methods to process List[PentagramResult] and extract behavioral signals including voting patterns, synthesis themes, and development indicators. Create helper methods for aggregating data across multiple Pentagram cycles and preparing it for drift analysis.",
+            "status": "pending",
+            "testStrategy": "Unit test with sample PentagramResult objects containing various behavioral patterns. Verify proper aggregation of voting patterns, synthesis themes, and development indicators across multiple cycles.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement drift metrics computation and analysis logic",
+            "description": "Develop the core drift detection logic that computes aggregate drift metrics and generates DriftReport objects",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement check_recent_drift(recent_results: List[PentagramResult], identity_topology: IdentityTopology) -> DriftReport method. Wrap existing IdentityTopology.check_drift() with aggregation logic. Compute aggregate drift metrics using existing DriftReport schema by analyzing behavioral changes across aggregated data from recent Pentagram cycles.",
+            "status": "pending",
+            "testStrategy": "Unit test with consistent vs drifting behavior patterns in sample data. Verify DriftReport generation with proper aggregation metrics and ensure compatibility with existing DriftReport schema.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Add periodic scheduling and insufficient data handling",
+            "description": "Implement periodic scheduling functionality and robust handling of edge cases with insufficient data",
+            "dependencies": [
+              2
+            ],
+            "details": "Add schedule_periodic_check() method that can be called hourly per omega_scar.json specification. Implement robust error handling for cases where insufficient recent data exists for meaningful drift analysis. Add logging and fallback mechanisms to ensure system stability when data is sparse or unavailable.",
+            "status": "pending",
+            "testStrategy": "Test insufficient data handling with empty or minimal PentagramResult lists. Verify periodic scheduling integration and proper error handling when drift analysis cannot be performed due to data constraints.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break into: 1) Create basic StandaloneDriftDetector structure and data aggregation, 2) Implement drift metrics computation and analysis logic, 3) Add periodic scheduling and insufficient data handling.",
+        "updatedAt": "2026-02-10T17:41:40.041Z"
+      },
+      {
+        "id": "78",
+        "title": "Create Vertex Unit Tests",
+        "description": "Unit tests for all 5 vertices with mocked LLM provider",
+        "details": "Create tests/test_omega_vertices.py with tests for Observer, Synthesizer, Catalyst, Architect, Orchestra vertices. Use unittest.mock.AsyncMock for LLM provider returning predefined JSON responses. Test each vertex with three domains: cooking conversation, code review, philosophy discussion to verify domain agnosticism. Verify vote() returns valid VertexVote with scores in [0,1] range. Test error handling path where LLM raises exception - should produce error vote, not crash. Test JSON parsing with malformed responses.",
+        "testStrategy": "pytest with AsyncMock. Test matrix: 5 vertices × 3 domains × (success + error cases). Verify all produce VertexVote objects with valid scores. Run: pytest tests/test_omega_vertices.py -v",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Observer Vertex Unit Tests",
+            "description": "Implement comprehensive unit tests for the Observer vertex with mocked LLM provider",
+            "dependencies": [],
+            "details": "Create test class TestObserverVertex in tests/test_omega_vertices.py. Use unittest.mock.AsyncMock to mock LLM provider with predefined JSON responses for Observer vertex. Test with three domains: cooking conversation, code review, philosophy discussion. Verify vote() method returns valid VertexVote with scores in [0,1] range. Test error handling when LLM raises exception - should produce error vote without crashing. Test JSON parsing with malformed responses.",
+            "status": "pending",
+            "testStrategy": "pytest with AsyncMock. Test matrix: Observer vertex × 3 domains × (success + error cases). Verify VertexVote objects with valid scores.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Create Synthesizer Vertex Unit Tests",
+            "description": "Implement comprehensive unit tests for the Synthesizer vertex with mocked LLM provider",
+            "dependencies": [],
+            "details": "Create test class TestSynthesizerVertex in tests/test_omega_vertices.py. Use unittest.mock.AsyncMock to mock LLM provider with predefined JSON responses for Synthesizer vertex. Test with three domains: cooking conversation, code review, philosophy discussion. Verify vote() method returns valid VertexVote with scores in [0,1] range. Test error handling when LLM raises exception - should produce error vote without crashing. Test JSON parsing with malformed responses.",
+            "status": "pending",
+            "testStrategy": "pytest with AsyncMock. Test matrix: Synthesizer vertex × 3 domains × (success + error cases). Verify VertexVote objects with valid scores.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create Catalyst Vertex Unit Tests",
+            "description": "Implement comprehensive unit tests for the Catalyst vertex with mocked LLM provider",
+            "dependencies": [],
+            "details": "Create test class TestCatalystVertex in tests/test_omega_vertices.py. Use unittest.mock.AsyncMock to mock LLM provider with predefined JSON responses for Catalyst vertex. Test with three domains: cooking conversation, code review, philosophy discussion. Verify vote() method returns valid VertexVote with scores in [0,1] range. Test error handling when LLM raises exception - should produce error vote without crashing. Test JSON parsing with malformed responses.",
+            "status": "pending",
+            "testStrategy": "pytest with AsyncMock. Test matrix: Catalyst vertex × 3 domains × (success + error cases). Verify VertexVote objects with valid scores.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Create Architect Vertex Unit Tests",
+            "description": "Implement comprehensive unit tests for the Architect vertex with mocked LLM provider",
+            "dependencies": [],
+            "details": "Create test class TestArchitectVertex in tests/test_omega_vertices.py. Use unittest.mock.AsyncMock to mock LLM provider with predefined JSON responses for Architect vertex. Test with three domains: cooking conversation, code review, philosophy discussion. Verify vote() method returns valid VertexVote with scores in [0,1] range. Test error handling when LLM raises exception - should produce error vote without crashing. Test JSON parsing with malformed responses.",
+            "status": "pending",
+            "testStrategy": "pytest with AsyncMock. Test matrix: Architect vertex × 3 domains × (success + error cases). Verify VertexVote objects with valid scores.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Create Orchestra Vertex Unit Tests",
+            "description": "Implement comprehensive unit tests for the Orchestra vertex with mocked LLM provider",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Create test class TestOrchestraVertex in tests/test_omega_vertices.py. Use unittest.mock.AsyncMock to mock LLM provider with predefined JSON responses for Orchestra vertex. Test with three domains: cooking conversation, code review, philosophy discussion. Verify vote() method returns valid VertexVote with scores in [0,1] range. Test error handling when LLM raises exception - should produce error vote without crashing. Test JSON parsing with malformed responses. Ensure all vertex tests are integrated and the complete test suite runs successfully.",
+            "status": "pending",
+            "testStrategy": "pytest with AsyncMock. Test matrix: Orchestra vertex × 3 domains × (success + error cases). Run complete test suite: pytest tests/test_omega_vertices.py -v",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break into individual vertex test suites: 1) Observer vertex tests, 2) Synthesizer vertex tests, 3) Catalyst vertex tests, 4) Architect vertex tests, 5) Orchestra vertex tests. Each should cover success cases, error handling, and domain agnosticism.",
+        "updatedAt": "2026-02-10T17:44:22.540Z"
+      },
+      {
+        "id": "79",
+        "title": "Create Kernel and Tension Analyzer Tests",
+        "description": "Unit tests for MetabolicKernel and TensionAnalyzer",
+        "details": "Create tests/test_omega_kernel.py. Test TensionAnalyzer with crafted VertexVote objects having conflicting scores to verify tension detection. Test MetabolicKernel with mocked vertices returning predefined votes - verify parallel collection with asyncio.gather(). Test heuristic synthesis produces valid KernelSynthesis with all required fields. Test complete PentagramResult assembly. Mock all 5 vertices to return controlled votes for predictable testing.",
+        "testStrategy": "pytest with mocked vertices. Create conflicting vote scenarios (Observer=0.9, Catalyst=0.1) to test tension detection. Verify kernel collects all 5 votes in parallel and produces complete PentagramResult.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create TensionAnalyzer Unit Tests with Conflict Scenarios",
+            "description": "Implement comprehensive unit tests for TensionAnalyzer class to verify tension detection across various conflict scenarios",
+            "dependencies": [],
+            "details": "Create test functions in tests/test_omega_kernel.py for TensionAnalyzer. Test with crafted VertexVote objects having conflicting scores (e.g., Observer=0.9, Catalyst=0.1) to verify tension detection algorithms. Include edge cases like unanimous agreement (no tension), maximum conflict (opposite extremes), and subtle disagreements. Test tension threshold calculations and ensure proper TensionReport generation with accurate conflict identification.",
+            "status": "pending",
+            "testStrategy": "pytest with manually crafted VertexVote objects representing different conflict patterns. Verify tension scores are calculated correctly and conflict detection works for various scenarios including edge cases.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Create MetabolicKernel Integration Tests with Parallel Execution",
+            "description": "Implement integration tests for MetabolicKernel focusing on parallel vote collection and complete result assembly",
+            "dependencies": [
+              1
+            ],
+            "details": "Create integration tests for MetabolicKernel in tests/test_omega_kernel.py. Mock all 5 vertices (Observer, Synthesizer, Catalyst, Architect, Orchestra) to return controlled, predefined votes for predictable testing. Verify parallel collection using asyncio.gather() works correctly and collects all votes simultaneously. Test heuristic synthesis produces valid KernelSynthesis with all required fields. Test complete PentagramResult assembly including vote aggregation, tension analysis, and final synthesis.",
+            "status": "pending",
+            "testStrategy": "pytest with AsyncMock for all 5 vertices returning controlled vote data. Verify asyncio.gather() parallel execution, validate KernelSynthesis structure, and ensure PentagramResult contains all expected components with proper data integrity.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 2,
+        "expansionPrompt": "Split into: 1) TensionAnalyzer unit tests with various conflict scenarios, 2) MetabolicKernel integration tests with mocked vertices and parallel execution verification.",
+        "updatedAt": "2026-02-10T17:44:24.467Z"
+      },
+      {
+        "id": "80",
+        "title": "Create Identity Topology Tests",
+        "description": "Unit tests for IdentityTopology: load, validate, apply, drift",
+        "details": "Create tests/test_omega_identity.py testing all IdentityTopology methods. Test load() with omega_scar.json. Test validate_change() with ProposedChange objects: approve changes in flexible regions, reject changes to invariant regions, return ambiguous for edge cases. Test apply_change() increments version and updates state. Test check_drift() with healthy vs unhealthy behavioral patterns. Use sample ProposedChange objects targeting different identity regions.",
+        "testStrategy": "pytest with omega_scar.json fixture. Test all decision paths: approve/reject/ambiguous validation, successful apply with version increment, drift detection with various behavioral signals.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create load() method test suite",
+            "description": "Implement comprehensive tests for IdentityTopology load() method with omega_scar.json fixture",
+            "dependencies": [],
+            "details": "Create test functions for loading omega_scar.json configuration file. Test successful loading with valid JSON structure, verify all identity regions are properly parsed and initialized. Test error handling for missing file, malformed JSON, and invalid schema. Verify loaded topology has correct structure with flexible and invariant regions properly defined.",
+            "status": "pending",
+            "testStrategy": "pytest with omega_scar.json fixture file. Test valid load, file not found exception, JSON parse errors, and schema validation failures.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Create validate_change() method test suite",
+            "description": "Implement tests for validate_change() method with various ProposedChange scenarios across different identity regions",
+            "dependencies": [
+              1
+            ],
+            "details": "Create comprehensive test cases using sample ProposedChange objects targeting flexible regions (should approve), invariant regions (should reject), and edge cases (should return ambiguous). Test boundary conditions between regions, changes affecting multiple regions, and invalid change objects. Verify correct validation logic and return values for all decision paths.",
+            "status": "pending",
+            "testStrategy": "pytest with mock ProposedChange objects. Test approve/reject/ambiguous decision paths with changes targeting different identity topology regions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create apply_change() method test suite",
+            "description": "Implement tests for apply_change() method focusing on version tracking and state updates",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create tests verifying that apply_change() correctly increments version numbers and updates topology state. Test successful application of approved changes, rejection of invalid changes, and proper state persistence. Verify version tracking works correctly across multiple sequential changes and that state rollback works when changes fail to apply.",
+            "status": "pending",
+            "testStrategy": "pytest with state tracking verification. Test version increment on successful apply, state updates, and error handling for failed applications.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Create check_drift() method test suite",
+            "description": "Implement tests for check_drift() method with healthy and unhealthy behavioral pattern detection",
+            "dependencies": [
+              1
+            ],
+            "details": "Create test cases with mock behavioral patterns representing healthy vs unhealthy identity states. Test drift detection algorithms with various behavioral signals, edge cases where drift is ambiguous, and performance with large behavioral datasets. Verify correct classification of behavioral patterns and appropriate drift scores or alerts.",
+            "status": "pending",
+            "testStrategy": "pytest with mock behavioral pattern data. Test healthy/unhealthy pattern classification, drift threshold detection, and edge case handling.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 4,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Break into method-specific test suites: 1) load() method tests, 2) validate_change() tests with various change scenarios, 3) apply_change() tests with version tracking, 4) check_drift() tests with behavioral patterns.",
+        "updatedAt": "2026-02-10T17:44:26.386Z"
+      },
+      {
+        "id": "81",
+        "title": "Create Extractor Unit Tests",
+        "description": "Unit tests for all 4 extractors + amalgamation with mocked LLM",
+        "details": "Create tests/test_omega_extractors.py testing InsightExtractor, CausalPatternExtractor, SelfObservationExtractor, AmalgamatedMemorySynthesizer. Use AsyncMock for LLM provider returning sample JSON for each extractor type. Verify each produces correct dataclass instances (InsightModel, CausalPatternModel, etc.). Test graceful handling of empty LLM responses and malformed JSON. Test AmalgamatedMemorySynthesizer with mix of new and existing memories.",
+        "testStrategy": "pytest with AsyncMock LLM. Test each extractor with valid JSON response produces correct model. Test error cases: empty response, malformed JSON, LLM exception. Verify amalgamation synthesizer combines memories correctly.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create InsightExtractor Unit Tests",
+            "description": "Implement comprehensive unit tests for the InsightExtractor class with mocked LLM responses",
+            "dependencies": [],
+            "details": "Create test suite for InsightExtractor in tests/test_omega_extractors.py. Use AsyncMock to mock LLM provider returning sample InsightModel JSON. Test successful extraction produces correct InsightModel dataclass instances. Test error handling for empty LLM responses, malformed JSON, and LLM exceptions. Verify all insight fields are properly validated and populated.",
+            "status": "pending",
+            "testStrategy": "pytest with AsyncMock LLM returning valid insight JSON, empty responses, and malformed JSON. Verify InsightModel creation and error handling.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Create CausalPatternExtractor Unit Tests",
+            "description": "Implement comprehensive unit tests for the CausalPatternExtractor class with mocked LLM responses",
+            "dependencies": [],
+            "details": "Create test suite for CausalPatternExtractor in tests/test_omega_extractors.py. Use AsyncMock to mock LLM provider returning sample CausalPatternModel JSON. Test successful extraction produces correct CausalPatternModel dataclass instances. Test error handling for empty LLM responses, malformed JSON, and LLM exceptions. Verify causal pattern fields are properly validated.",
+            "status": "pending",
+            "testStrategy": "pytest with AsyncMock LLM returning valid causal pattern JSON, empty responses, and malformed JSON. Verify CausalPatternModel creation and error handling.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create SelfObservationExtractor Unit Tests",
+            "description": "Implement comprehensive unit tests for the SelfObservationExtractor class with mocked LLM responses",
+            "dependencies": [],
+            "details": "Create test suite for SelfObservationExtractor in tests/test_omega_extractors.py. Use AsyncMock to mock LLM provider returning sample SelfObservationModel JSON. Test successful extraction produces correct SelfObservationModel dataclass instances. Test error handling for empty LLM responses, malformed JSON, and LLM exceptions. Verify self-observation fields are properly validated.",
+            "status": "pending",
+            "testStrategy": "pytest with AsyncMock LLM returning valid self-observation JSON, empty responses, and malformed JSON. Verify SelfObservationModel creation and error handling.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Create AmalgamatedMemorySynthesizer Unit Tests",
+            "description": "Implement comprehensive unit tests for the AmalgamatedMemorySynthesizer class with memory combination scenarios",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Create test suite for AmalgamatedMemorySynthesizer in tests/test_omega_extractors.py. Use AsyncMock to mock LLM provider returning amalgamated memory JSON. Test synthesis with mix of new and existing memories from different extractors. Test successful synthesis produces correct amalgamated memory instances. Test error handling for empty responses and malformed JSON. Verify memory combination logic works correctly.",
+            "status": "pending",
+            "testStrategy": "pytest with AsyncMock LLM and sample memory combinations. Test synthesis with various memory mixes, verify amalgamation logic, and test error handling scenarios.",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Break into extractor-specific test suites: 1) InsightExtractor tests, 2) CausalPatternExtractor tests, 3) SelfObservationExtractor tests, 4) AmalgamatedMemorySynthesizer tests with memory combination scenarios.",
+        "updatedAt": "2026-02-10T17:44:28.313Z"
+      },
+      {
+        "id": "82",
+        "title": "Create End-to-End Pentagram Integration Test",
+        "description": "Integration test that runs a full Pentagram cycle with mocked LLM, verifying the complete flow from experience input to PentagramResult output",
+        "details": "Create tests/test_omega_integration.py with complete MetabolicKernel assembled with all 5 vertices (LLM mocked to return valid JSON). Send test experience through full cycle. Verify: all 5 vertex votes collected, TensionAnalyzer produces tensions, heuristic synthesis creates KernelSynthesis, DevelopmentMonitor records cycle, timing data captured in PentagramResult. This validates the 'one complete loop' requirement.",
+        "testStrategy": "pytest async integration test. Mock LLM for all vertices, send sample experience, verify complete PentagramResult with all fields populated. Measure execution time, verify development monitoring.",
+        "priority": "medium",
+        "dependencies": [
+          "72"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up complete mocked environment with all vertices",
+            "description": "Create comprehensive test setup with mocked LLM provider and all 5 vertices configured for integration testing",
+            "dependencies": [],
+            "details": "Create tests/test_omega_integration.py with AsyncMock for LLM provider returning valid JSON responses for all 5 vertices (Observer, Synthesizer, Catalyst, Architect, Orchestra). Set up complete MetabolicKernel with all vertices properly initialized. Configure mock responses to simulate realistic vertex voting behavior with valid scores in [0,1] range. Include setup for TensionAnalyzer, heuristic synthesis, and DevelopmentMonitor components.",
+            "status": "pending",
+            "testStrategy": "pytest fixture with AsyncMock LLM returning predefined JSON for each vertex type",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement full cycle execution test",
+            "description": "Create the main integration test that executes a complete Pentagram cycle from experience input to result output",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement async test function that sends a test experience through the complete Pentagram cycle. Execute all phases: vertex voting collection from all 5 vertices, tension analysis processing, heuristic synthesis creating KernelSynthesis, and development monitoring recording. Ensure the test validates the 'one complete loop' requirement by verifying each phase executes in proper sequence and produces expected intermediate results.",
+            "status": "pending",
+            "testStrategy": "pytest async test with sample experience input, verify complete cycle execution and phase transitions",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Add result validation and timing verification",
+            "description": "Implement comprehensive validation of PentagramResult output and timing data capture verification",
+            "dependencies": [
+              2
+            ],
+            "details": "Add assertions to verify PentagramResult contains all required fields: all 5 vertex votes collected with valid scores, tensions produced by TensionAnalyzer, KernelSynthesis created by heuristic synthesis, and timing data properly captured. Implement timing verification to ensure execution time is measured and recorded. Validate that all result components are properly populated and contain expected data structures.",
+            "status": "pending",
+            "testStrategy": "Assert all PentagramResult fields populated, verify timing data captured, validate data structure integrity",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Add development monitoring integration verification",
+            "description": "Verify DevelopmentMonitor properly records the complete cycle and integrates with the overall system",
+            "dependencies": [
+              3
+            ],
+            "details": "Add test assertions to verify DevelopmentMonitor records the cycle execution properly. Check that development monitoring captures cycle metadata, execution phases, and system state changes. Verify integration between DevelopmentMonitor and other components works correctly. Test that monitoring data is accessible and contains expected cycle information for debugging and analysis purposes.",
+            "status": "pending",
+            "testStrategy": "Verify DevelopmentMonitor records cycle data, check monitoring integration with system components",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Break into integration components: 1) Set up complete mocked environment with all vertices, 2) Implement full cycle execution test, 3) Add result validation and timing verification, 4) Add development monitoring integration verification.",
+        "updatedAt": "2026-02-10T17:44:30.257Z"
+      },
+      {
+        "id": "83",
+        "title": "Update AGENTS.md with Omega Layer Section",
+        "description": "Add omega_layer section to AGENTS.md directory structure, architecture diagram, and key files reference",
+        "details": "Add new section to AGENTS.md after existing directory structure. Include complete omega_layer/ directory tree showing all modules. Add Pentagram architecture description with 5 vertices, metabolic kernel, tension analysis. Add to 'Key Abstractions' section: Pentagram cycle, vertex voting, identity topology, development monitoring. Include instructions for enabling omega_mode. Update architecture diagram if present.",
+        "testStrategy": "Visual review of AGENTS.md to ensure omega_layer is properly documented with directory tree, architecture explanation, and key concepts covered.",
+        "priority": "low",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add omega_layer directory structure section to AGENTS.md",
+            "description": "Create a new section in AGENTS.md that documents the complete omega_layer directory tree with all modules and submodules",
+            "dependencies": [],
+            "details": "Add a new section after the existing directory structure in AGENTS.md. Include the complete omega_layer/ directory tree showing kernel/, vertices/, identity/, development/, corpus/, extractors/, and prompts/en/ modules with brief descriptions of each module's purpose.",
+            "status": "pending",
+            "testStrategy": "Visual review to ensure directory tree is complete and accurately reflects the omega_layer structure",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Document Pentagram architecture in AGENTS.md",
+            "description": "Add comprehensive documentation of the Pentagram architecture including the 5 vertices, metabolic kernel, and tension analysis",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a detailed architecture section explaining the Pentagram's 5 vertices (Observer, Synthesizer, Validator, Executor, Reflector), the metabolic kernel that processes information flow, and the tension analysis system that monitors vertex interactions and development progress.",
+            "status": "pending",
+            "testStrategy": "Review documentation for completeness and accuracy of Pentagram architecture description",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Update Key Abstractions section with omega concepts",
+            "description": "Add omega-specific abstractions to the existing Key Abstractions section in AGENTS.md",
+            "dependencies": [
+              2
+            ],
+            "details": "Extend the Key Abstractions section to include: Pentagram cycle (the complete processing loop through all 5 vertices), vertex voting (consensus mechanism between vertices), identity topology (self-referential structure mapping), and development monitoring (tracking omega layer evolution and capabilities).",
+            "status": "pending",
+            "testStrategy": "Verify all four key omega abstractions are clearly documented with appropriate detail",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Add omega_mode enabling instructions",
+            "description": "Document the process for enabling and configuring omega_mode in the system",
+            "dependencies": [
+              3
+            ],
+            "details": "Add a dedicated section explaining how to enable omega_mode, including configuration parameters, environment variables, API endpoints, and any prerequisites. Include examples of how to verify omega_mode is active and functioning correctly.",
+            "status": "pending",
+            "testStrategy": "Follow documented instructions to verify they accurately enable omega_mode",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Update architecture diagram with omega_layer integration",
+            "description": "Modify the existing architecture diagram in AGENTS.md to include omega_layer components and their relationships",
+            "dependencies": [
+              4
+            ],
+            "details": "If an architecture diagram exists in AGENTS.md, update it to show how omega_layer integrates with existing components. Include the Pentagram structure, connections to agentic_layer and infra_layer, and data flow between omega vertices and the metabolic kernel.",
+            "status": "pending",
+            "testStrategy": "Visual inspection of updated diagram to ensure omega_layer integration is clearly represented and accurate",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 2,
+        "recommendedSubtasks": 0,
+        "expansionPrompt": "",
+        "updatedAt": "2026-02-10T17:45:47.584Z"
+      },
+      {
+        "id": "84",
+        "title": "Update CLAUDE.md with Omega Commands",
+        "description": "Add omega quick commands to CLAUDE.md",
+        "details": "Add new section to CLAUDE.md with omega-specific entry points and commands. Include: how to test Pentagram cycle (POST /api/v1/omega/process), how to run individual vertices, how to check development monitoring, how to enable/disable omega_mode, key omega_layer files to examine. Add to existing command reference structure.",
+        "testStrategy": "Visual review of CLAUDE.md to ensure omega commands are clearly documented and follow existing format.",
+        "priority": "low",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Omega Commands Section Structure in CLAUDE.md",
+            "description": "Add a new section header and basic structure for omega commands in CLAUDE.md following existing documentation format",
+            "dependencies": [],
+            "details": "Create a new section titled 'Omega Commands' in CLAUDE.md. Follow the existing documentation structure and formatting conventions. Add subsection placeholders for different types of omega commands and operations.",
+            "status": "pending",
+            "testStrategy": "Visual review to ensure section header and structure matches existing CLAUDE.md formatting",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Document Pentagram Cycle Testing Command",
+            "description": "Add documentation for testing the Pentagram cycle using POST /api/v1/omega/process endpoint",
+            "dependencies": [
+              1
+            ],
+            "details": "Document the POST /api/v1/omega/process endpoint with example usage, required parameters, expected responses, and common use cases for testing the complete Pentagram cycle.",
+            "status": "pending",
+            "testStrategy": "Verify command syntax and endpoint documentation is accurate and complete",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Document Individual Vertex Execution Commands",
+            "description": "Add commands and instructions for running individual Pentagram vertices independently",
+            "dependencies": [
+              1
+            ],
+            "details": "Document how to execute individual vertices of the Pentagram cycle, including command syntax, vertex names, parameters, and expected outputs for each vertex operation.",
+            "status": "pending",
+            "testStrategy": "Review vertex command documentation for completeness and accuracy",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Document Development Monitoring and Omega Mode Commands",
+            "description": "Add commands for checking development monitoring status and enabling/disabling omega_mode",
+            "dependencies": [
+              1
+            ],
+            "details": "Document commands for checking development monitoring status, enabling omega_mode, disabling omega_mode, and viewing current omega system status. Include configuration options and troubleshooting tips.",
+            "status": "pending",
+            "testStrategy": "Verify monitoring and mode toggle commands are properly documented with examples",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Document Key Omega Layer Files Reference",
+            "description": "Add reference section listing key omega_layer files that developers should examine",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a reference section listing important omega_layer files with brief descriptions of their purpose, including core modules, configuration files, and key implementation files that developers need to understand.",
+            "status": "pending",
+            "testStrategy": "Visual review to ensure file references are complete and descriptions are helpful for developers",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 2,
+        "recommendedSubtasks": 0,
+        "expansionPrompt": "",
+        "updatedAt": "2026-02-10T17:45:49.484Z"
+      },
+      {
+        "id": "85",
+        "title": "Create Open WebUI Filter Function",
+        "description": "Create a complete Open WebUI Filter Function (Python) that routes conversations through the Pentagram via EverMemOS API",
+        "details": "Create standalone Python file for Open WebUI Filter Function with inlet() and outlet() methods. inlet() captures user message, POSTs to /api/v1/omega/process with experience data, retrieves memories and self-reflection, injects as system context before LLM. outlet() captures AI response, POSTs to /api/v1/memories for storage. Include Valves class for configuration: evermemos_url, omega_mode toggle, max_memories. Make toggleable in Open WebUI UI. Handle API errors gracefully. Follow Open WebUI filter function patterns.",
+        "testStrategy": "Manual test by pasting into Open WebUI Admin > Functions, configuring valves, testing with conversation, verifying memories created in EverMemOS database.",
+        "priority": "high",
+        "dependencies": [
+          "72"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement inlet() method with API integration and context injection",
+            "description": "Create the inlet() method that captures user messages, sends them to EverMemOS Omega API, and injects retrieved memories as system context",
+            "dependencies": [],
+            "details": "Implement inlet() method in Open WebUI filter function that: 1) Captures incoming user message from body parameter, 2) Constructs experience data payload with user message and conversation context, 3) Makes POST request to /api/v1/omega/process endpoint with proper headers and error handling, 4) Parses response to extract memories and self-reflection data, 5) Injects retrieved memories as system context into the conversation before LLM processing, 6) Returns modified body with enhanced context for downstream processing",
+            "status": "pending",
+            "testStrategy": "Test with mock API responses, verify context injection format, test error handling with invalid API responses",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement outlet() method with response capture and storage",
+            "description": "Create the outlet() method that captures AI responses and stores them in EverMemOS via the memories API endpoint",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement outlet() method in Open WebUI filter function that: 1) Captures AI response from body parameter after LLM processing, 2) Extracts relevant conversation data including user message, AI response, and metadata, 3) Constructs memory payload with conversation context and response data, 4) Makes POST request to /api/v1/memories endpoint to store the interaction, 5) Handles API errors gracefully without breaking conversation flow, 6) Returns unmodified body to maintain normal Open WebUI operation, 7) Logs successful memory storage for debugging",
+            "status": "pending",
+            "testStrategy": "Test memory storage with various conversation types, verify API payload format, test graceful error handling when storage fails",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Add Valves configuration class and error handling",
+            "description": "Implement Valves configuration class for Open WebUI settings and comprehensive error handling throughout the filter function",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create Valves class following Open WebUI patterns with configurable parameters: evermemos_url (string, default localhost:8000), omega_mode (boolean toggle, default True), max_memories (integer, default 10). Add comprehensive error handling: API connection timeouts, invalid JSON responses, authentication failures, network errors. Implement graceful degradation where filter continues working even if EverMemOS is unavailable. Add logging for debugging and monitoring. Ensure filter can be toggled on/off via Open WebUI interface without breaking conversations.",
+            "status": "pending",
+            "testStrategy": "Test all Valves configurations, verify graceful degradation with API failures, test toggle functionality in Open WebUI interface",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break into: 1) Implement inlet() method with API integration and context injection, 2) Implement outlet() method with response capture and storage, 3) Add Valves configuration class and error handling.",
+        "updatedAt": "2026-02-10T17:47:13.121Z"
+      },
+      {
+        "id": "86",
+        "title": "Create Open WebUI Integration Documentation",
+        "description": "Document how to set up the Open WebUI filter function, configure it, and verify it works",
+        "details": "Create docs/usage/OPEN_WEBUI_INTEGRATION.md with step-by-step guide: 1) Start EverMemOS with omega_mode enabled, 2) Copy filter function code to Open WebUI Admin > Functions, 3) Configure Valves (EverMemOS URL, omega mode toggle), 4) Test with sample conversation, 5) Verify memories created in database, 6) Troubleshooting common issues. Include code snippets and screenshots where helpful.",
+        "testStrategy": "Follow the documentation from scratch to set up integration, verify all steps work correctly and produce expected results.",
+        "priority": "medium",
+        "dependencies": [
+          "85"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create documentation file structure and introduction",
+            "description": "Create the OPEN_WEBUI_INTEGRATION.md file with proper structure and introduction section",
+            "dependencies": [],
+            "details": "Create docs/usage/OPEN_WEBUI_INTEGRATION.md with markdown structure including title, table of contents, introduction explaining the integration purpose, prerequisites section listing EverMemOS and Open WebUI requirements, and overview of the integration process.",
+            "status": "pending",
+            "testStrategy": "Verify file is created in correct location with proper markdown formatting and complete introduction section",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Document EverMemOS setup and omega mode configuration",
+            "description": "Document step-by-step process for starting EverMemOS with omega_mode enabled",
+            "dependencies": [
+              1
+            ],
+            "details": "Add detailed section covering: starting EverMemOS server, enabling omega_mode in configuration, verifying the server is running correctly, checking API endpoints are accessible, and confirming omega mode is active. Include command examples and expected output.",
+            "status": "pending",
+            "testStrategy": "Follow the documented steps to start EverMemOS and verify omega mode is properly enabled",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Document Open WebUI filter function installation and configuration",
+            "description": "Document how to copy filter function code to Open WebUI and configure Valves settings",
+            "dependencies": [
+              2
+            ],
+            "details": "Add section covering: accessing Open WebUI Admin > Functions interface, copying the filter function code, configuring Valves including EverMemOS URL setting and omega mode toggle, saving the configuration, and enabling the function. Include screenshots of the UI and code snippets.",
+            "status": "pending",
+            "testStrategy": "Follow the installation steps to successfully install and configure the filter function in Open WebUI",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Document testing and verification procedures",
+            "description": "Document how to test the integration with sample conversations and verify memory creation",
+            "dependencies": [
+              3
+            ],
+            "details": "Add comprehensive testing section covering: conducting sample conversations in Open WebUI, verifying memories are created in EverMemOS database, checking API logs for successful requests, validating memory content and structure, and confirming the integration is working end-to-end.",
+            "status": "pending",
+            "testStrategy": "Execute the documented test procedures and verify all verification steps produce expected results",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Document troubleshooting guide and common issues",
+            "description": "Create troubleshooting section covering common integration issues and their solutions",
+            "dependencies": [
+              4
+            ],
+            "details": "Add troubleshooting section covering: connection errors between Open WebUI and EverMemOS, API authentication issues, omega mode not working properly, memory creation failures, performance issues, and configuration problems. Include diagnostic steps, error message explanations, and step-by-step solutions.",
+            "status": "pending",
+            "testStrategy": "Review troubleshooting guide for completeness and test solutions against common integration problems",
+            "parentId": "undefined"
+          }
+        ],
+        "complexity": 3,
+        "recommendedSubtasks": 0,
+        "expansionPrompt": "",
+        "updatedAt": "2026-02-10T17:47:15.042Z"
       }
     ],
     "metadata": {
-      "created": "2026-02-09T16:00:57.521Z",
-      "updated": "2026-02-09T16:11:02.960Z",
-      "description": "Tasks for master context"
+      "version": "1.0.0",
+      "lastModified": "2026-02-10T17:47:15.042Z",
+      "taskCount": 39,
+      "completedCount": 39,
+      "tags": [
+        "master"
+      ]
     }
   }
 }

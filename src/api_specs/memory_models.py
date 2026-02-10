@@ -96,6 +96,12 @@ class MemoryType(str, Enum):
     FORESIGHT = "foresight"  # Prospective memory
     EVENT_LOG = "event_log"  # Event log (atomic facts)
 
+    # ===== Omega Layer Memory Types =====
+    INSIGHT = "insight"  # What Omega learned (any domain)
+    CAUSAL_PATTERN = "causal_pattern"  # Cause-effect chains Omega observed
+    SELF_OBSERVATION = "self_observation"  # What Omega learns about itself
+    AMALGAMATED = "amalgamated"  # Synthesized understanding from new + existing
+
     # ===== Not yet implemented or deprecated =====
     BASE_MEMORY = "base_memory"  # [Not implemented]
     PREFERENCE = "preference"  # [Not implemented]
@@ -401,6 +407,113 @@ class ForesightModel:
     metadata: Metadata = field(default_factory=Metadata)
 
 
+# ===== Omega Layer Memory Models =====
+
+
+@dataclass
+class InsightModel:
+    """What Omega learned from an experience (any domain).
+
+    Domain-agnostic insight extraction — cooking, code, philosophy all valid.
+    """
+
+    id: str
+    user_id: str
+    insight_text: str  # The new understanding that formed
+    evidence: str  # What in the conversation supports this
+    domain: str  # Primary domain (e.g., 'cooking', 'software', 'relationships')
+
+    # Scoring
+    depth_level: int = 1  # 1-5 (1=surface, 5=fundamental realization)
+    novelty_score: float = 0.0  # 0-1 (0=already knew, 1=completely new)
+    connects_to: Optional[str] = None  # What existing knowledge this extends
+
+    # Common fields
+    group_id: Optional[str] = None
+    timestamp: Optional[datetime] = None
+    extend: Optional[Dict[str, Any]] = None
+    created_at: datetime = field(default_factory=get_now_with_timezone)
+    updated_at: datetime = field(default_factory=get_now_with_timezone)
+    metadata: Optional[Metadata] = None
+
+
+@dataclass
+class CausalPatternModel:
+    """Cause-effect relationship Omega observed in experience."""
+
+    id: str
+    user_id: str
+    cause: str  # What triggers the effect
+    effect: str  # What results from the cause
+    evidence: str  # What demonstrates this pattern
+
+    # Scoring
+    confidence: float = 0.5  # 0-1 (causal vs merely correlated)
+    domain: str = "general"
+    is_novel: bool = True
+    direction: str = "cause_to_effect"  # cause_to_effect | bidirectional | complex
+
+    # Common fields
+    group_id: Optional[str] = None
+    timestamp: Optional[datetime] = None
+    extend: Optional[Dict[str, Any]] = None
+    created_at: datetime = field(default_factory=get_now_with_timezone)
+    updated_at: datetime = field(default_factory=get_now_with_timezone)
+    metadata: Optional[Metadata] = None
+
+
+@dataclass
+class SelfObservationModel:
+    """What Omega learned about itself from an experience."""
+
+    id: str
+    user_id: str
+    observation: str  # What Omega noticed about itself
+    aspect: str  # reasoning_style, knowledge_depth, knowledge_gap, etc.
+
+    # Scoring
+    growth_indicator: float = 0.0  # -1 to 1 (-1=regression, 1=significant growth)
+    evidence: str = ""
+
+    # Common fields
+    group_id: Optional[str] = None
+    timestamp: Optional[datetime] = None
+    extend: Optional[Dict[str, Any]] = None
+    created_at: datetime = field(default_factory=get_now_with_timezone)
+    updated_at: datetime = field(default_factory=get_now_with_timezone)
+    metadata: Optional[Metadata] = None
+
+
+@dataclass
+class AmalgamatedMemoryModel:
+    """Synthesized understanding from combining new + existing knowledge.
+
+    The KEY differentiator: 1+1=3. New experience cross-referenced
+    with existing memories produces enriched understanding.
+    """
+
+    id: str
+    user_id: str
+    synthesis: str  # The new understanding formed from combination
+    synthesis_type: str  # EXTENSION, CORRECTION, CONNECTION, NOVEL
+
+    # Sources
+    new_source_summary: str = ""  # What new memory contributed
+    existing_source_summary: str = ""  # What existing memory contributed
+
+    # Scoring
+    confidence: float = 0.5
+    significance: float = 0.5
+
+    # Common fields
+    group_id: Optional[str] = None
+    timestamp: Optional[datetime] = None
+    extend: Optional[Dict[str, Any]] = None
+    created_at: datetime = field(default_factory=get_now_with_timezone)
+    updated_at: datetime = field(default_factory=get_now_with_timezone)
+    metadata: Optional[Metadata] = None
+
+
 # Union type definition
 MemoryModel = Union[
     # BaseMemoryModel,
@@ -415,4 +528,9 @@ MemoryModel = Union[
     # CoreMemoryModel,
     EventLogModel,
     ForesightModel,
+    # Omega Layer
+    InsightModel,
+    CausalPatternModel,
+    SelfObservationModel,
+    AmalgamatedMemoryModel,
 ]

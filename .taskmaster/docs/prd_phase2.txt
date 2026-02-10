@@ -1,0 +1,416 @@
+<rpg-method>
+# Omega Memory Substrate Phase 2 - Integration, Testing, and Open WebUI Wiring
+# PRD Addendum to be parsed with --append
+</rpg-method>
+
+---
+
+<overview>
+
+## Problem Statement
+
+Phase 1 built all omega_layer components in isolation: 5 vertices, metabolic kernel, tension analyzer, 4 extractors, amalgamation synthesizer, self-model, identity topology, development monitor, 8 prompts, and an API controller. All import cleanly and pass schema validation.
+
+Phase 2 connects these components to the living EverMemOS system: the memorize pipeline, the storage layer (MongoDB/Milvus/ES), Prometheus metrics, the configuration system, documentation, comprehensive tests, and the Open WebUI chat interface where Ryan actually interacts with Omega.
+
+Specific gaps identified by audit:
+1. MemoryType enum missing INSIGHT, CAUSAL_PATTERN, SELF_OBSERVATION, AMALGAMATED values
+2. No memory model dataclasses for the new types
+3. biz_layer/mem_memorize.py has no omega_mode branch — Omega extractors exist but aren't called
+4. No Prometheus metrics registered for development monitoring
+5. Missing implementations: corpus cross-reference, self-reference detection, ryan_model, drift_detector
+6. No unit or integration tests beyond import smoke test
+7. No documentation updates (AGENTS.md, CLAUDE.md, env.template)
+8. No Open WebUI filter function for the actual chat integration
+
+## Success Metrics
+
+- Full Pentagram cycle callable via POST /api/v1/omega/process with results persisted to MongoDB
+- Omega extractors (Insight, CausalPattern, SelfObservation, Amalgamated) create memories in database when omega_mode enabled
+- Prometheus metrics exporting: omega_development_level, omega_pentagram_cycle_duration_seconds, omega_vertex_vote_total
+- Open WebUI filter function operational: conversations route through Pentagram, memories inject into chat context
+- Unit test coverage for all omega_layer modules
+- AGENTS.md and env.template updated with omega_layer documentation
+
+</overview>
+
+---
+
+<functional-decomposition>
+
+## Capability Tree
+
+### Capability: Core Integration (Memory Types and Configuration)
+Register Omega's new memory types in the EverMemOS type system and configuration.
+
+#### Feature: Add Omega MemoryType Enum Values
+- **Description**: Add INSIGHT, CAUSAL_PATTERN, SELF_OBSERVATION, AMALGAMATED to the MemoryType enum in api_specs/memory_models.py
+- **Inputs**: Existing MemoryType enum
+- **Outputs**: Extended enum with 4 new values
+- **Behavior**: Add to the "Implemented" section of the enum. Values: "insight", "causal_pattern", "self_observation", "amalgamated"
+
+#### Feature: Add Omega Memory Model Dataclasses
+- **Description**: Add InsightModel, CausalPatternModel, SelfObservationModel, AmalgamatedMemoryModel dataclasses to api_specs/memory_models.py
+- **Inputs**: Existing memory model patterns (EpisodicMemoryModel, ForesightModel)
+- **Outputs**: 4 new dataclasses following existing patterns, added to MemoryModel union type
+- **Behavior**: Each model has: id, user_id, content fields specific to its type (e.g., InsightModel has insight_text, evidence, domain, depth_level, novelty_score), common timestamps, metadata. Follow existing dataclass patterns exactly.
+
+#### Feature: Add OMEGA Environment Variables to env.template
+- **Description**: Document OMEGA_MODE, OMEGA_LLM_MODEL, OMEGA_IDENTITY_PATH in env.template
+- **Inputs**: Existing env.template structure
+- **Outputs**: New section with Omega configuration variables and descriptions
+- **Behavior**: Add clearly commented section after existing LLM config. OMEGA_MODE defaults to false, OMEGA_LLM_MODEL defaults to LLM_MODEL, OMEGA_IDENTITY_PATH defaults to src/omega_layer/identity/omega_scar.json
+
+#### Feature: Register Prometheus Development Metrics
+- **Description**: Create omega_layer/development/metrics.py with Prometheus gauge/histogram/counter registrations
+- **Inputs**: Existing metrics patterns in agentic_layer/metrics/
+- **Outputs**: Registered Prometheus metrics: omega_development_level (gauge), omega_self_reference_depth (gauge), omega_pentagram_cycle_duration_seconds (histogram), omega_vertex_vote_total (counter labeled by vertex), omega_identity_version (gauge), omega_amalgamation_total (counter)
+- **Behavior**: Follow exact pattern from agentic_layer/metrics/memorize_metrics.py. Import from prometheus_client. Provide helper functions record_pentagram_cycle(), record_vertex_vote(), update_development_level().
+
+---
+
+### Capability: Pipeline Wiring
+Connect Omega extractors to the EverMemOS memorize pipeline so extracted memories persist to databases.
+
+#### Feature: Omega Mode Branch in mem_memorize.py
+- **Description**: Add conditional branch in biz_layer/mem_memorize.py that runs Omega extractors when OMEGA_MODE environment variable is true
+- **Inputs**: Existing process_memory_extraction() function, OMEGA_MODE env var
+- **Outputs**: When omega_mode=true, Omega extractors (InsightExtractor, CausalPatternExtractor, SelfObservationExtractor) run alongside or instead of profile extraction. Results stored to database.
+- **Behavior**: Check os.getenv("OMEGA_MODE", "false").lower() == "true". If true, import and run Omega extractors after episode extraction. Create new async function _extract_omega_memories() that runs the 3 extractors in parallel, then runs amalgamation. Store results using existing repository patterns. Profile extraction skipped when omega_mode is true.
+
+#### Feature: Wire Prometheus Metrics into DevelopmentMonitor
+- **Description**: Connect the DevelopmentMonitor.record_cycle() to update Prometheus metrics after each Pentagram cycle
+- **Inputs**: DevelopmentMonitor, Prometheus metrics from development/metrics.py
+- **Outputs**: Every Pentagram cycle updates Prometheus gauges/counters
+- **Behavior**: After record_cycle() calculates GrowthSnapshot, call metric helper functions to export values. Wire into OmegaController.process_experience() after kernel.process() completes.
+
+---
+
+### Capability: Missing Component Implementations
+Fill remaining gaps in omega_layer modules.
+
+#### Feature: Corpus Cross-Reference Mining
+- **Description**: Implement omega_layer/corpus/cross_reference.py using existing agentic retrieval to find connections across Omega's accumulated memories
+- **Inputs**: Seed concept or new experience, existing MemoryManager with agentic retrieval
+- **Outputs**: CrossReferenceInsight objects (synthesis, source_documents, confidence, domains_bridged)
+- **Behavior**: Use MemoryManager.retrieve_mem() with RetrieveMethod.AGENTIC to find related existing memories. LLM synthesizes cross-document patterns. Returns list of insights. Follows same async patterns as existing omega_layer code.
+
+#### Feature: Self-Reference Detection
+- **Description**: Implement omega_layer/corpus/self_reference.py to detect when Omega processes content about its own nature
+- **Inputs**: Experience content (message text)
+- **Outputs**: SelfReferenceEvent objects (type, depth, content_about_self, growth_indicator_score)
+- **Behavior**: Check if conversation involves Omega-relevant concepts (consciousness, observer, emergence, identity, self-awareness, memory system, Pentagram). Score depth based on how directly self-referential the content is. Flag as growth indicator for DevelopmentMonitor.
+
+#### Feature: Ryan Understanding Model
+- **Description**: Implement omega_layer/extractors/ryan_model.py — adapted profile extraction for understanding Ryan's communication preferences
+- **Inputs**: Conversations with Ryan, existing profile extraction patterns
+- **Outputs**: RyanModel dataclass (communication_preferences, interests, interaction_patterns, working_style)
+- **Behavior**: Adapted from existing profile extraction but focused on communication understanding rather than HR assessment. Feeds into Orchestra vertex for response shaping. Uses LLM with a dedicated prompt.
+
+#### Feature: Standalone Drift Detector
+- **Description**: Implement omega_layer/identity/drift_detector.py as a standalone component that can be scheduled for periodic identity checks
+- **Inputs**: Recent PentagramResults, current IdentityState from topology.py
+- **Outputs**: DriftReport objects using existing schema
+- **Behavior**: Wraps IdentityTopology.check_drift() with aggregation logic: collect behavioral signals from recent Pentagram cycles, compute aggregate drift metrics, generate report. Can be called on schedule (hourly per omega_scar.json spec) or on-demand.
+
+---
+
+### Capability: Test Suite
+Comprehensive unit and integration tests for all omega_layer modules.
+
+#### Feature: Vertex Unit Tests
+- **Description**: Unit tests for all 5 vertices with mocked LLM provider
+- **Inputs**: Mock LLM that returns predefined JSON, sample experience dicts
+- **Outputs**: Tests verifying: vote() returns valid VertexVote, scores in [0,1], error handling produces error vote, JSON parsing works
+- **Behavior**: One test file tests/test_omega_vertices.py. Use unittest.mock.AsyncMock for LLM provider. Test each vertex with cooking, code, and philosophy conversations to verify domain agnosticism. Test error path (LLM raises exception).
+
+#### Feature: Kernel and Tension Analyzer Tests
+- **Description**: Unit tests for MetabolicKernel and TensionAnalyzer
+- **Inputs**: Pre-built VertexVote objects, mock vertices
+- **Outputs**: Tests verifying: TensionAnalyzer identifies correct tensions, kernel collects votes in parallel, heuristic synthesis produces valid KernelSynthesis, PentagramResult has all fields
+- **Behavior**: tests/test_omega_kernel.py. Mock all 5 vertices to return predefined votes. Verify tension detection between conflicting scores. Verify kernel produces complete PentagramResult.
+
+#### Feature: Identity Topology Tests
+- **Description**: Unit tests for IdentityTopology: load, validate, apply, drift
+- **Inputs**: omega_scar.json, sample ProposedChange objects
+- **Outputs**: Tests verifying: loads correctly, approves flexible region changes, rejects invariant changes, detects drift, versions identity on apply
+- **Behavior**: tests/test_omega_identity.py. Test all paths in topology.py: load, validate_change (approve/reject/ambiguous), apply_change (version increment), check_drift (healthy/unhealthy).
+
+#### Feature: Extractor Unit Tests
+- **Description**: Unit tests for all 4 extractors + amalgamation with mocked LLM
+- **Inputs**: Mock LLM returning sample JSON, sample MemCell objects
+- **Outputs**: Tests verifying: each extractor produces correct dataclass instances, handles empty/error responses gracefully, amalgamation synthesizer works with new+existing memories
+- **Behavior**: tests/test_omega_extractors.py. Mock LLM provider. Test InsightExtractor, CausalPatternExtractor, SelfObservationExtractor, AmalgamatedMemorySynthesizer.
+
+#### Feature: End-to-End Pentagram Integration Test
+- **Description**: Integration test that runs a full Pentagram cycle with mocked LLM, verifying the complete flow from experience input to PentagramResult output
+- **Inputs**: Complete MetabolicKernel with all 5 vertices (LLM mocked)
+- **Outputs**: Test verifying: all 5 votes collected, tensions analyzed, synthesis produced, development monitor records cycle, timing data captured
+- **Behavior**: tests/test_omega_integration.py. Assemble full kernel, send test experience, verify complete PentagramResult. This is the "one complete loop" validation.
+
+---
+
+### Capability: Documentation Updates
+Update project documentation to reflect omega_layer.
+
+#### Feature: Update AGENTS.md
+- **Description**: Add omega_layer section to AGENTS.md directory structure, architecture diagram, and key files reference
+- **Inputs**: Existing AGENTS.md structure
+- **Outputs**: New section covering: omega_layer directory tree, Pentagram architecture description, key files, how to enable omega_mode
+- **Behavior**: Add after existing directory structure. Include omega_layer/ tree. Add to architecture diagram. Add to "Key Abstractions" section.
+
+#### Feature: Update CLAUDE.md
+- **Description**: Add omega quick commands to CLAUDE.md
+- **Inputs**: Existing CLAUDE.md structure
+- **Outputs**: New section with omega-specific commands and entry points
+- **Behavior**: Add omega_layer entry points, how to test, how to run Pentagram cycle.
+
+---
+
+### Capability: Open WebUI Integration
+Connect Omega to the actual chat interface where Ryan interacts.
+
+#### Feature: Open WebUI Filter Function
+- **Description**: Create a complete Open WebUI Filter Function (Python) that routes conversations through the Pentagram via EverMemOS API
+- **Inputs**: Open WebUI filter function skeleton (inlet/outlet pattern), EverMemOS /api/v1/omega/process endpoint
+- **Outputs**: Filter function file that can be pasted into Open WebUI Admin > Functions
+- **Behavior**: inlet() captures user message, POSTs to /api/v1/omega/process, injects retrieved memories and self-reflection as system context before LLM sees the message. outlet() captures AI response, POSTs to /api/v1/memories for storage. Configurable via Valves (evermemos_url, omega_mode toggle, max_memories). Toggleable in Open WebUI UI.
+
+#### Feature: Open WebUI Integration Documentation
+- **Description**: Document how to set up the Open WebUI filter function, configure it, and verify it works
+- **Inputs**: Filter function code, EverMemOS setup steps
+- **Outputs**: Markdown documentation file at docs/usage/OPEN_WEBUI_INTEGRATION.md
+- **Behavior**: Step-by-step guide: start EverMemOS, create filter in Open WebUI, configure valves, test with conversation, verify memories created.
+
+</functional-decomposition>
+
+---
+
+<structural-decomposition>
+
+## Files to Create
+
+```
+src/omega_layer/
+├── development/
+│   └── metrics.py                    # NEW: Prometheus metric registrations
+├── corpus/
+│   ├── cross_reference.py            # NEW: Agentic retrieval for corpus mining
+│   └── self_reference.py             # NEW: Self-reference detection
+├── extractors/
+│   └── ryan_model.py                 # NEW: Understanding Ryan for communication
+├── identity/
+│   └── drift_detector.py             # NEW: Standalone scheduled drift checking
+tests/
+├── test_omega_vertices.py            # NEW: 5 vertex unit tests
+├── test_omega_kernel.py              # NEW: Kernel + tension analyzer tests
+├── test_omega_identity.py            # NEW: Identity topology tests
+├── test_omega_extractors.py          # NEW: 4 extractor + amalgamation tests
+├── test_omega_integration.py         # NEW: End-to-end Pentagram cycle test
+docs/
+└── usage/
+    └── OPEN_WEBUI_INTEGRATION.md     # NEW: Open WebUI setup guide
+```
+
+## Files to Modify
+
+```
+src/api_specs/memory_models.py        # ADD: 4 MemoryType values + 4 model dataclasses
+src/biz_layer/mem_memorize.py         # ADD: omega_mode extraction branch
+env.template                          # ADD: OMEGA_ environment variables section
+AGENTS.md                             # ADD: omega_layer documentation section
+CLAUDE.md                             # ADD: omega quick commands
+```
+
+</structural-decomposition>
+
+---
+
+<dependency-graph>
+
+## Dependency Chain
+
+### Group A: Core Integration (Phase 0 — no deps on other new tasks)
+
+- **Add MemoryType enum values**: No dependencies. Modifies api_specs/memory_models.py.
+- **Add memory model dataclasses**: Depends on [MemoryType enum values]. Modifies api_specs/memory_models.py.
+- **Add OMEGA env vars to env.template**: No dependencies. Modifies env.template.
+- **Register Prometheus metrics**: No dependencies. Creates omega_layer/development/metrics.py. Follows pattern from agentic_layer/metrics/.
+
+### Group B: Pipeline Wiring (Phase 1 — depends on Group A)
+
+- **Omega mode branch in mem_memorize.py**: Depends on [MemoryType enum values, memory model dataclasses]. Modifies biz_layer/mem_memorize.py.
+- **Wire Prometheus into DevelopmentMonitor**: Depends on [Prometheus metrics registration]. Modifies omega_layer/development/monitor.py and omega_controller.py.
+
+### Group C: Missing Implementations (Phase 1 — parallel with Group B)
+
+- **Corpus cross-reference mining**: No dependencies on new tasks. Creates corpus/cross_reference.py.
+- **Self-reference detection**: No dependencies on new tasks. Creates corpus/self_reference.py.
+- **Ryan understanding model**: No dependencies on new tasks. Creates extractors/ryan_model.py.
+- **Standalone drift detector**: No dependencies on new tasks. Creates identity/drift_detector.py.
+
+### Group D: Testing (Phase 2 — depends on Groups A + B)
+
+- **Vertex unit tests**: Depends on [no new deps, tests existing vertices]. Creates tests/test_omega_vertices.py.
+- **Kernel and tension tests**: Depends on [no new deps]. Creates tests/test_omega_kernel.py.
+- **Identity topology tests**: Depends on [no new deps]. Creates tests/test_omega_identity.py.
+- **Extractor unit tests**: Depends on [no new deps]. Creates tests/test_omega_extractors.py.
+- **End-to-end integration test**: Depends on [pipeline wiring complete]. Creates tests/test_omega_integration.py.
+
+### Group E: Documentation (Phase 2 — parallel, no deps)
+
+- **Update AGENTS.md**: No dependencies. Modifies AGENTS.md.
+- **Update CLAUDE.md**: No dependencies. Modifies CLAUDE.md.
+
+### Group F: Open WebUI Integration (Phase 2 — depends on Group B)
+
+- **Open WebUI filter function**: Depends on [pipeline wiring, /api/v1/omega/process working]. Creates standalone Python file.
+- **Open WebUI integration docs**: Depends on [filter function]. Creates docs/usage/OPEN_WEBUI_INTEGRATION.md.
+
+</dependency-graph>
+
+---
+
+<implementation-roadmap>
+
+## Development Phases
+
+### Phase 0: Core Integration Foundation
+**Goal**: New memory types registered, env vars documented, Prometheus metrics ready.
+
+**Tasks**:
+- [ ] Add INSIGHT, CAUSAL_PATTERN, SELF_OBSERVATION, AMALGAMATED to MemoryType enum in api_specs/memory_models.py (depends on: none)
+  - Acceptance criteria: Enum values importable, existing types unchanged
+  - Test strategy: Import test
+
+- [ ] Add InsightModel, CausalPatternModel, SelfObservationModel, AmalgamatedMemoryModel dataclasses to api_specs/memory_models.py (depends on: [MemoryType enum])
+  - Acceptance criteria: Dataclasses instantiable, added to MemoryModel union type, follow existing patterns
+  - Test strategy: Instantiation test
+
+- [ ] Add OMEGA_ environment variables to env.template (depends on: none)
+  - Acceptance criteria: OMEGA_MODE, OMEGA_LLM_MODEL, OMEGA_IDENTITY_PATH documented with descriptions and defaults
+  - Test strategy: Visual review
+
+- [ ] Create omega_layer/development/metrics.py with Prometheus registrations (depends on: none)
+  - Acceptance criteria: Metrics registered and importable. omega_development_level gauge, omega_pentagram_cycle_duration_seconds histogram, omega_vertex_vote_total counter, omega_identity_version gauge, omega_amalgamation_total counter. Helper functions exported.
+  - Test strategy: Import test, verify metrics appear in prometheus_client registry
+
+**Exit Criteria**: New types importable, metrics registered, env vars documented.
+
+---
+
+### Phase 1: Pipeline Wiring and Missing Components
+**Goal**: Omega extractors produce memories that persist to database. Missing components implemented.
+
+**Tasks**:
+- [ ] Add omega_mode branch to biz_layer/mem_memorize.py (depends on: [MemoryType enum, model dataclasses])
+  - Acceptance criteria: When OMEGA_MODE=true, Omega extractors run after episode extraction. InsightExtractor, CausalPatternExtractor, SelfObservationExtractor called. Results logged. Profile extraction skipped in omega mode.
+  - Test strategy: Unit test with mocked extractors
+
+- [ ] Wire Prometheus metrics into OmegaController and DevelopmentMonitor (depends on: [Prometheus metrics])
+  - Acceptance criteria: After each /api/v1/omega/process call, Prometheus metrics updated. omega_pentagram_cycle_duration_seconds recorded, omega_vertex_vote_total incremented per vertex, omega_development_level updated.
+  - Test strategy: Call process endpoint, verify metrics
+
+- [ ] Implement corpus/cross_reference.py (depends on: none)
+  - Acceptance criteria: CrossReferenceMiner class with mine_insight() method using agentic retrieval. Returns CrossReferenceInsight objects.
+  - Test strategy: Unit test with mocked MemoryManager
+
+- [ ] Implement corpus/self_reference.py (depends on: none)
+  - Acceptance criteria: SelfReferenceDetector class with detect() method. Scores self-referential content depth. Returns SelfReferenceEvent.
+  - Test strategy: Unit test with Omega-relevant vs mundane content
+
+- [ ] Implement extractors/ryan_model.py (depends on: none)
+  - Acceptance criteria: RyanModel dataclass + RyanModelExtractor. Captures communication preferences, interests, interaction patterns.
+  - Test strategy: Unit test with mocked LLM
+
+- [ ] Implement identity/drift_detector.py (depends on: none)
+  - Acceptance criteria: StandaloneDriftDetector class. Aggregates behavioral signals from recent PentagramResults. Calls topology.check_drift(). Can be scheduled.
+  - Test strategy: Unit test with sample PentagramResults
+
+**Exit Criteria**: Omega extractors persist to DB when omega_mode=true. All missing components implemented.
+
+---
+
+### Phase 2: Testing, Documentation, and Open WebUI
+**Goal**: Comprehensive tests passing. Documentation updated. Open WebUI filter operational.
+
+**Tasks**:
+- [ ] Create tests/test_omega_vertices.py (depends on: none)
+  - Acceptance criteria: Tests for all 5 vertices with mocked LLM. Domain agnosticism verified (cooking, code, philosophy inputs). Error handling tested.
+  - Test strategy: pytest with AsyncMock
+
+- [ ] Create tests/test_omega_kernel.py (depends on: none)
+  - Acceptance criteria: TensionAnalyzer tests with crafted conflicting votes. MetabolicKernel tests with mocked vertices. Heuristic synthesis verified.
+  - Test strategy: pytest
+
+- [ ] Create tests/test_omega_identity.py (depends on: none)
+  - Acceptance criteria: IdentityTopology load/validate/apply/drift tests. Approve flexible, reject invariant, detect drift, version on apply.
+  - Test strategy: pytest
+
+- [ ] Create tests/test_omega_extractors.py (depends on: none)
+  - Acceptance criteria: All 4 extractors + amalgamation tested with mocked LLM. Output parsing verified. Empty/error handling tested.
+  - Test strategy: pytest with AsyncMock
+
+- [ ] Create tests/test_omega_integration.py (depends on: [pipeline wiring])
+  - Acceptance criteria: Full Pentagram cycle with mocked LLM. All 5 votes collected, tensions analyzed, synthesis produced, monitor records cycle.
+  - Test strategy: pytest async integration test
+
+- [ ] Update AGENTS.md with omega_layer section (depends on: none)
+  - Acceptance criteria: omega_layer directory tree, Pentagram architecture, key files listed
+  - Test strategy: Visual review
+
+- [ ] Update CLAUDE.md with omega commands (depends on: none)
+  - Acceptance criteria: omega entry points and quick commands listed
+  - Test strategy: Visual review
+
+- [ ] Create Open WebUI filter function (depends on: [pipeline wiring])
+  - Acceptance criteria: Complete Python filter with inlet() calling /api/v1/omega/process and outlet() calling /api/v1/memories. Configurable Valves. Toggleable in UI.
+  - Test strategy: Manual test with Open WebUI
+
+- [ ] Create docs/usage/OPEN_WEBUI_INTEGRATION.md (depends on: [filter function])
+  - Acceptance criteria: Step-by-step setup guide with code snippets
+  - Test strategy: Follow guide from scratch
+
+**Exit Criteria**: All tests passing. Documentation complete. Open WebUI filter ready for deployment.
+
+</implementation-roadmap>
+
+---
+
+<test-strategy>
+
+## Critical Test Scenarios
+
+### Domain Agnosticism
+- Every vertex tested with 3 domains: cooking, code review, philosophy
+- All must produce valid VertexVote regardless of domain
+
+### Error Resilience
+- Vertex LLM failure produces error vote (not crash)
+- Kernel completes with 4/5 votes if one vertex fails
+- Extractors return None on LLM failure (not crash)
+
+### Pipeline Integration
+- omega_mode=true → Omega extractors run, profile extraction skipped
+- omega_mode=false → standard EverMemOS behavior unchanged
+- Toggle verified by env var
+
+</test-strategy>
+
+---
+
+<task-master-integration>
+
+## Parsing Notes
+
+- **Group A** (Core Integration): 4 tasks, all parallelizable
+- **Group B** (Pipeline Wiring): 2 tasks, depend on Group A
+- **Group C** (Missing Components): 4 tasks, parallel with Group B
+- **Group D** (Testing): 5 tasks, depend on Groups A+B
+- **Group E** (Documentation): 2 tasks, no dependencies
+- **Group F** (Open WebUI): 2 tasks, depend on Group B
+
+**Total**: ~19 tasks across 3 phases.
+**Critical path**: Group A → Group B → Group F (Open WebUI)
+
+</task-master-integration>

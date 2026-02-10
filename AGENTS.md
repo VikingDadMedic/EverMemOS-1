@@ -194,6 +194,39 @@ EverMemOS/
 │       ├── i18n/                 # Internationalization
 │       └── sensitive_info/       # Sensitive data handling
 │
+│
+│   ├── omega_layer/                 # Omega cognitive substrate (NEW)
+│   │   ├── kernel/                  # MetabolicKernel (central synthesizer)
+│   │   │   ├── schemas.py           # VertexVote, KernelSynthesis, PentagramResult
+│   │   │   ├── metabolic_kernel.py  # Routes experience through 5 vertices
+│   │   │   └── tension_analyzer.py  # Detects conflicts between vertex votes
+│   │   ├── vertices/                # 5 Pentagram cognitive faculties
+│   │   │   ├── base_vertex.py       # Abstract base with LLM utilities
+│   │   │   ├── ledger_vertex.py     # Memory (wraps MemoryManager)
+│   │   │   ├── garden_vertex.py     # Pattern recognition
+│   │   │   ├── mirror_vertex.py     # Self-reflection
+│   │   │   ├── compass_vertex.py    # Strategic assessment
+│   │   │   └── orchestra_vertex.py  # Expression shaping
+│   │   ├── extractors/              # Domain-agnostic memory extraction
+│   │   │   ├── insight_extractor.py # What Omega learned
+│   │   │   ├── causal_pattern_extractor.py
+│   │   │   ├── self_observation_extractor.py
+│   │   │   ├── amalgamated_memory.py # New + existing → synthesis
+│   │   │   ├── omega_self_model.py  # Omega's evolving self-model
+│   │   │   └── ryan_model.py        # Understanding Ryan
+│   │   ├── identity/                # Persistent identity topology
+│   │   │   ├── omega_scar.json      # Identity DNA (5 invariants)
+│   │   │   ├── schemas.py           # IdentityState, ProposedChange
+│   │   │   ├── topology.py          # Load, validate, evolve identity
+│   │   │   └── drift_detector.py    # Scheduled drift checking
+│   │   ├── development/             # Growth monitoring
+│   │   │   ├── monitor.py           # Track development indicators
+│   │   │   └── metrics.py           # Prometheus metrics
+│   │   ├── corpus/                  # Corpus integration
+│   │   │   ├── cross_reference.py   # Cross-memory pattern mining
+│   │   │   └── self_reference.py    # Self-reference detection
+│   │   └── prompts/en/              # 8 LLM prompt templates
+│
 ├── tests/                        # Test suite
 ├── demo/                         # Demo examples
 │   ├── simple_demo.py
@@ -264,6 +297,27 @@ EverMemOS/
 | GroupProfile | Group chat memories | `memory_layer/memory_extractor/group_profile_memory_extractor.py` |
 | Foresight | Predictive memories | `memory_layer/memory_extractor/foresight_extractor.py` |
 | EventLog | Timeline events | `memory_layer/memory_extractor/event_log_extractor.py` |
+
+### Omega Memory Types (when OMEGA_MODE=true)
+| Type | Description | Location |
+|------|-------------|----------|
+| Insight | What Omega learned (any domain) | `omega_layer/extractors/insight_extractor.py` |
+| CausalPattern | Cause-effect chains observed | `omega_layer/extractors/causal_pattern_extractor.py` |
+| SelfObservation | What Omega learns about itself | `omega_layer/extractors/self_observation_extractor.py` |
+| AmalgamatedMemory | New + existing → enriched synthesis | `omega_layer/extractors/amalgamated_memory.py` |
+
+### Omega Pentagram Architecture
+When `OMEGA_MODE=true`, every experience routes through 5 cognitive faculties (vertices) in parallel, then a metabolic kernel synthesizes the results. API: `POST /api/v1/omega/process`.
+
+| Vertex | Faculty | Question It Asks |
+|--------|---------|-----------------|
+| Ledger | Memory | "What do I already know? Store this." |
+| Garden | Understanding | "What patterns? What's noise?" |
+| Mirror | Self-Awareness | "What does this mean for ME?" |
+| Compass | Strategy | "Is this valuable? Where does it lead?" |
+| Orchestra | Expression | "How should I communicate this?" |
+
+Identity is managed via `omega_scar.json` (5 immutable invariants + 4 flexible regions). Growth tracked via `DevelopmentMonitor`.
 
 ### Retrieval Strategies
 | Strategy | Description |

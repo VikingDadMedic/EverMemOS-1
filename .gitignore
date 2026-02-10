@@ -243,3 +243,20 @@ node_modules/
 # Task files
 # tasks.json
 # tasks/ 
+
+# Taskmaster sensitive files
+.taskmaster/.env
+.taskmaster/reports/
+
+# Cursor config (may contain API keys)
+.cursor/mcp.json
+
+# Raw conversation exports (contain API keys and sensitive data)
+raw_conversations/
+
+# Omega docs (analysis docs, not code)
+EXECUTIVE_SUMMARY_FOR_RYAN.md
+IMPLEMENTATION_HANDOFF_CONSCIOUSNESS_SUBSTRATE.md
+META_ANALYSIS_CONSCIOUSNESS_ARCHITECTURE_GAP.md
+META_ANALYSIS_QUALITY_AND_PURPOSE.md
+OMEGA_EXECUTIVE_BRIEF.md

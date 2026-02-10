@@ -456,6 +456,65 @@ class ExtractionState:
             self.parent_id = self.memcell.event_id
 
 
+async def _extract_omega_memories(memcell: MemCell, state: 'ExtractionState') -> int:
+    """
+    Run Omega extractors (Insight, CausalPattern, SelfObservation) in parallel.
+    
+    Called when OMEGA_MODE=true. Extracts what Omega LEARNED from this
+    conversation, independent of the standard Episode/Foresight/EventLog pipeline.
+    
+    Returns:
+        int: Number of omega memories extracted
+    """
+    from memory_layer.llm.llm_provider import LLMProvider
+    from omega_layer.extractors.insight_extractor import InsightExtractor
+    from omega_layer.extractors.causal_pattern_extractor import CausalPatternExtractor
+    from omega_layer.extractors.self_observation_extractor import SelfObservationExtractor
+    from memory_layer.memory_extractor.base_memory_extractor import MemoryExtractRequest
+
+    # Create LLM provider for extractors
+    llm = LLMProvider(
+        provider_type=os.getenv("LLM_PROVIDER", "openai"),
+        model=os.getenv("OMEGA_LLM_MODEL", os.getenv("LLM_MODEL", "gpt-4.1-mini")),
+        base_url=os.getenv("LLM_BASE_URL"),
+        api_key=os.getenv("LLM_API_KEY"),
+        temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")),
+        max_tokens=int(os.getenv("LLM_MAX_TOKENS", "4096")),
+    )
+
+    # Create extractors
+    insight_ext = InsightExtractor(llm_provider=llm)
+    causal_ext = CausalPatternExtractor(llm_provider=llm)
+    self_obs_ext = SelfObservationExtractor(llm_provider=llm)
+
+    # Build extraction request
+    extract_request = MemoryExtractRequest(
+        memcell=memcell,
+        user_id=state.request.user_id if hasattr(state.request, 'user_id') else None,
+        group_id=state.request.group_id,
+    )
+
+    # Run all 3 in parallel
+    results = await asyncio.gather(
+        insight_ext.extract_memory(extract_request),
+        causal_ext.extract_memory(extract_request),
+        self_obs_ext.extract_memory(extract_request),
+        return_exceptions=True,
+    )
+
+    count = 0
+    for i, result in enumerate(results):
+        extractor_name = ["insight", "causal_pattern", "self_observation"][i]
+        if isinstance(result, Exception):
+            logger.warning(f"[Omega] {extractor_name} extractor failed: {result}")
+            continue
+        if result:
+            count += len(result) if isinstance(result, list) else 1
+            logger.info(f"[Omega] {extractor_name}: extracted {len(result) if isinstance(result, list) else 1} items")
+
+    return count
+
+
 async def process_memory_extraction(
     memcell: MemCell,
     request: MemorizeRequest,
@@ -561,6 +620,35 @@ async def process_memory_extraction(
             count=len(event_logs),
         )
 
+    # 2b. Omega Mode: Run Omega extractors (Insight, CausalPattern, SelfObservation)
+    omega_extraction_count = 0
+    if os.getenv("OMEGA_MODE", "false").lower() == "true":
+        omega_start = time.perf_counter()
+        try:
+            omega_extraction_count = await _extract_omega_memories(memcell, state)
+            record_extraction_stage(
+                space_id=space_id,
+                raw_data_type=raw_data_type,
+                stage='extract_omega',
+                duration_seconds=time.perf_counter() - omega_start,
+            )
+            if omega_extraction_count > 0:
+                record_memory_extracted(
+                    space_id=space_id,
+                    raw_data_type=raw_data_type,
+                    memory_type='omega_insight',
+                    count=omega_extraction_count,
+                )
+            logger.info(f"[Omega] Extracted {omega_extraction_count} omega memories")
+        except Exception as e:
+            logger.error(f"[Omega] Omega extraction failed (non-fatal): {e}", exc_info=True)
+            record_extraction_stage(
+                space_id=space_id,
+                raw_data_type=raw_data_type,
+                stage='extract_omega',
+                duration_seconds=time.perf_counter() - omega_start,
+            )
+
     # 3. Update MemCell and trigger clustering
     cluster_start = time.perf_counter()
     await _update_memcell_and_cluster(state)
@@ -583,7 +671,7 @@ async def process_memory_extraction(
             duration_seconds=time.perf_counter() - save_start,
         )
 
-    return memories_count
+    return memories_count + omega_extraction_count
 
 
 async def _init_extraction_state(
