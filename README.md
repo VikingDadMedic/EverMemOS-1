@@ -13,7 +13,7 @@
 [![License][license-badge]][license]
 
 
-<p><strong>Share EverMemOS Repository</strong></p>
+<!-- <p><strong>Share EverMemOS Repository</strong></p>
 
 [![][share-x-shield]][share-x-link]
 [![][share-linkedin-shield]][share-linkedin-link]
@@ -21,7 +21,7 @@
 [![][share-telegram-shield]][share-telegram-link]
 [![][share-whatsapp-shield]][share-whatsapp-link]
 [![][share-mastodon-shield]][share-mastodon-link]
-[![][share-weibo-shield]][share-weibo-link]
+[![][share-weibo-shield]][share-weibo-link] -->
 
 
 [Documentation][documentation] •
@@ -87,11 +87,11 @@ Welcome to EverMemOS! Join our community to help improve the project and collabo
 | Community | Purpose |
 | :-------- | :------ |
 | [![Discord][discord-badge]][discord] | Join our Discord community |
-| [![Hugging Face Space][hugging-face-badge]][hugging-face] | Join our Hugging Face community to explore our spaces and models |
+| [![WeChat][wechat-badge]][wechat] | Join the WeChat discussion group |
 | [![X][x-badge]][x] | Follow updates on X |
 | [![LinkedIn][linkedin-badge]][linkedin] | Connect with us on LinkedIn |
+| [![Hugging Face Space][hugging-face-badge]][hugging-face] | Join our Hugging Face community to explore our spaces and models |
 | [![Reddit][reddit-badge]][reddit] | Join the Reddit community |
-| [![WeChat][wechat-badge]][wechat] | Join the WeChat discussion group |
 
 
 <br>
@@ -102,35 +102,6 @@ Welcome to EverMemOS! Join our community to help improve the project and collabo
 ![star us gif](https://github.com/user-attachments/assets/0c512570-945a-483a-9f47-8e067bd34484)
 
 <br>
-
-<!-- ## Why EverMemOS
-
-### How EverMemOS works
-![image](https://github.com/user-attachments/assets/2a2a4f15-9185-47b3-9182-9c28145e18a4)
-
-EverMemOS enables AI to not only remember what happened, but understand the meaning behind memories and use them to guide decisions. Achieving **93% reasoning accuracy** on the LoCoMo benchmark, EverMemOS provides long-term memory capabilities for conversational AI agents through structured extraction, intelligent retrieval, and progressive profile building.
-
-![divider][divider-light]
-![divider][divider-dark]
-
-
-### EverMemOS benchmark
-
-![image](https://github.com/user-attachments/assets/9583e4de-8f3b-4681-ab5f-10ee82327da8)
-
-* 🎯 93% Accuracy - Best-in-class performance on LoCoMo benchmark
-* 🚀 Production Ready - Enterprise-grade with Milvus vector DB, Elasticsearch, MongoDB, and Redis
-* 🔧 Easy Integration - Simple REST API, works with any LLM
-* 📊 Multi-Modal Memory - Episodes, facts, preferences, relations
-* 🔍 Smart Retrieval - BM25, embeddings, or agentic search
-
-<br>
-
-<div align="right">
-
-[![][back-to-top]][readme-top]
-
-</div> -->
 
 ## Introduction
 
@@ -159,7 +130,7 @@ EverMemOS enables AI to not only remember what happened, but understand the mean
 - 🔍 **Smart Retrieval** - BM25, embeddings, or agentic search
 
 <p align="center">
-  <img src="figs/benchmark.png" alt="EverMemOS Benchmark Results" width="800"/>
+  <img src="https://github.com/user-attachments/assets/a6ff7523-db24-40f5-96ab-aa94f41b2392" alt="EverMemOS Benchmark Results" width="800"/>
   <br>
   <em>EverMemOS outperforms existing memory systems across all major benchmarks</em>
 </p>
@@ -199,14 +170,14 @@ cp env.template .env
 #   - VECTORIZE_API_KEY (for embedding/rerank)
 
 # 5. Start server
-uv run python src/run.py --port 8001
+uv run python src/run.py
 
 # 6. Verify installation
-curl http://localhost:8001/health
+curl http://localhost:1995/health
 # Expected response: {"status": "healthy", ...}
 ```
 
-✅ Server running at `http://localhost:8001` • [Full Setup Guide](docs/installation/SETUP.md)
+✅ Server running at `http://localhost:1995` • [Full Setup Guide](docs/installation/SETUP.md)
 
 <br>
 
@@ -217,7 +188,7 @@ Store and retrieve memories with simple Python code:
 ```python
 import requests
 
-API_BASE = "http://localhost:8001/api/v1"
+API_BASE = "http://localhost:1995/api/v1"
 
 # 1. Store a conversation memory
 requests.post(f"{API_BASE}/memories", json={
@@ -250,7 +221,7 @@ for memory_group in result.get("memories", []):
 
 ```bash
 # Terminal 1: Start the API server
-uv run python src/run.py --port 8001
+uv run python src/run.py
 
 # Terminal 2: Run the simple demo
 uv run python src/bootstrap.py demo/simple_demo.py
@@ -447,7 +418,7 @@ Read our [Contribution Guidelines](CONTRIBUTING.md) for code standards and Git w
 [divider-light]: https://github.com/user-attachments/assets/aec54c94-ced9-4683-ae58-0a5a7ed803bd#gh-light-mode-only
 [divider-dark]: https://github.com/user-attachments/assets/d57fad08-4f49-4a1c-bdfc-f659a5d86150#gh-dark-mode-only
 
-[banner-gif]: https://github.com/user-attachments/assets/8b76874b-c09c-4953-8807-08274777b8d6
+[banner-gif]: https://github.com/user-attachments/assets/965d9f07-9f4b-4ac1-8d0f-a3f5391b7bf2
 
 <!-- Header Badges -->
 [arxiv-badge]: https://img.shields.io/badge/arXiv-EverMemOS_Paper-F5C842?labelColor=gray&style=flat-square&logo=arxiv&logoColor=white
@@ -506,7 +477,7 @@ Read our [Contribution Guidelines](CONTRIBUTING.md) for code standards and Git w
 
 <!-- Language Links -->
 [lang-en-readme]: README.md
-[lang-zh-readme]: README_zh.md
+[lang-zh-readme]: README.md
 
 <!-- Community Links -->
 [discord]: https://discord.gg/gYep5nQRZJ
